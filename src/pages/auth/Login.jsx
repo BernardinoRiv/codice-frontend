@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import imagenFondo from '../../IMG_1534.JPG.jpeg'; 
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -13,7 +14,6 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -28,19 +28,49 @@ function Login() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Credenciales incorrectas o usuario bloqueado.');
+      if (!response.ok || data.exito === false) {
+        
+        if (data.bloqueadoHasta) {
+          const fechaDesbloqueo = new Date(data.bloqueadoHasta);
+          const hora = fechaDesbloqueo.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          toast.error('Cuenta bloqueada por seguridad', {
+            description: `Demasiados intentos. Intenta nuevamente a las ${hora}.`
+          });
+        } 
+        else if (data.intentosFallidos !== undefined && data.intentosFallidos > 0) {
+          toast.error(data.mensaje || 'Credenciales incorrectas', {
+            description: `Llevas ${data.intentosFallidos} intento(s) fallido(s).`
+          });
+        } 
+        else {
+          toast.error(data.mensaje || 'Credenciales incorrectas.', {
+            description: 'Por favor verifica tu correo y contraseña.'
+          });
+        }
+        
+        setIsLoading(false);
+        return; 
       }
 
-      // Guardamos credenciales del usuario
+      // Guardamos la información del usuario en el navegador
       localStorage.setItem('token', data.token);
       localStorage.setItem('nombreCompleto', data.nombreCompleto);
       localStorage.setItem('rol', data.rol);
       
+      // ¡AQUÍ ESTÁ LA MAGIA!: Guardamos el último acceso (puede ser la fecha o 'null')
+      localStorage.setItem('ultimoAcceso', data.ultimoAcceso);
+      
+      toast.success(`¡Bienvenido, ${data.nombreCompleto}!`);
+      
+      // Redirigimos al dashboard. (Si ultimoAcceso es null, el Router de App.jsx lo interceptará)
       navigate('/dashboard/inicio');
 
     } catch (err) {
-      setError(err.message);
+      toast.error('Error de conexión', {
+        description: 'No se pudo conectar con el servidor. Revisa tu internet.'
+      });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -53,46 +83,36 @@ function Login() {
         </h1>
       </div>
 
-      {/* Tarjeta Modal (Corregida sin zoom) */}
-<div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-3xl min-h-[480px] z-20">
+      <div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-3xl min-h-[480px] z-20">
         
-        {/* Banner izquierdo */}
+        {/* ================= BANNER IZQUIERDO ================= */}
         <div className="hidden md:flex md:w-5/12 relative">
           <img 
-            src="https://www.uma.edu.sv/img/sedes/santaana.jpg" 
+            src={imagenFondo}
             alt="Fondo Institucional UMA" 
             className="absolute inset-0 w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+          {/* Un gradiente oscuro pero suave para no matar la foto */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+          
+          {/* Texto elegante y formal */}
           <div className="relative z-10 p-10 w-full h-full flex flex-col justify-end">
             <div className="text-white">
-              <h3 className="text-xl font-bold mb-2 drop-shadow-md">Portal Académico</h3>
-              <p className="text-sm opacity-90 leading-relaxed drop-shadow-md">
+              <h3 className="text-2xl font-semibold tracking-wide mb-2 drop-shadow-md">
+                Portal Académico
+              </h3>
+              <p className="text-sm text-gray-200/90 leading-relaxed font-light drop-shadow-sm">
                 Gestiona tus clases, notas y herramientas institucionales en un solo lugar.
               </p>
             </div>
           </div>
         </div>
+        {/* ============================================================== */}
 
         {/* Formulario derecho */}
         <div className="w-full md:w-7/12 p-8 sm:p-10 md:p-16 flex flex-col justify-center relative z-20 bg-white">
-          <h2 className="text-5xl font-inder font-normal text-black mb-2">Iniciar Sesión</h2>
+          <h2 className="text-5xl font-inder font-normal text-black mb-2">Iniciar sesión</h2>
           <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales institucionales.</p>
-
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="mb-6 flex items-center space-x-3 text-red-500 bg-red-50/80 px-4 py-3 rounded-xl text-sm border border-red-100/50 backdrop-blur-sm"
-            >
-              {/* Icono de advertencia minimalista */}
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 shrink-0">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="font-medium tracking-wide">{error}</span>
-            </motion.div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -133,7 +153,6 @@ function Login() {
               </button>
             </div>
 
-            {/* Fila ajustada: Solo enlace de olvido de contraseña alineado a la derecha */}
             <div className="flex justify-end text-sm mt-2 mb-6">
               <a href="#" className="text-gray-500 hover:text-black transition">
                 ¿Olvidaste tu contraseña?

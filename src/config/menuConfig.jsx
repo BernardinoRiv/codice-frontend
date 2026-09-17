@@ -5,7 +5,6 @@ export const menuMaestro = [
   { 
     name: 'Inicio', 
     path: '/dashboard/inicio', 
-    // Todos los roles de la base de datos ven el inicio
     rolesPermitidos: ['DOCENTE', 'ESTUDIANTE', 'FINANZAS', 'ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -16,7 +15,6 @@ export const menuMaestro = [
   { 
     name: 'Mis Clases', 
     path: '/dashboard/clases', 
-    // Estudiantes y docentes ven sus clases (y los admin para revisar)
     rolesPermitidos: ['DOCENTE', 'ESTUDIANTE', 'ADMINISTRADOR'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -27,11 +25,31 @@ export const menuMaestro = [
   { 
     name: 'Ingreso de Notas', 
     path: '/dashboard/notas', 
-    // Solo docentes y administradores pueden ingresar notas
-    rolesPermitidos: ['DOCENTE', 'ADMINISTRADOR'], 
+    rolesPermitidos: ['DOCENTE'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+      </svg>
+    )
+  },
+  { 
+    name: 'Registro Docente', 
+    path: '/dashboard/registro-docente',
+    rolesPermitidos: ['ADMINISTRADOR'], 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 19v-2.25c0-1.243-1.007-2.25-2.25-2.25h-7.5A2.25 2.25 0 0 0 6 16.75V19m12 0v-2.25c0-1.243-1.007-2.25-2.25-2.25h-7.5A2.25 2.25 0 0 0 6 16.75V19m12 0a2.25 2.25 0 0 1-2.25 2.25h-7.5A2.25 2.25 0 0 1 6 19v-2.25a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 16.75V19Zm-6-7.5a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 8v4m2-2h-4" />
+      </svg>
+    )
+  },
+  { 
+    name: 'Registro Empleado', 
+    path: '/dashboard/registro-empleados', // Coincide exactamente con la ruta de tu App.jsx
+    rolesPermitidos: ['ADMINISTRADOR'], 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z" />
       </svg>
     )
   },
