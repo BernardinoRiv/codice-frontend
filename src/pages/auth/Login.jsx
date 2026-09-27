@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import imagenFondo from '../../IMG_1534.JPG.jpeg'; 
+import imagenFondo from '../../IMG_1534.JPG.jpeg';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -29,41 +29,31 @@ function Login() {
       const data = await response.json();
 
       if (!response.ok || data.exito === false) {
-        
         if (data.bloqueadoHasta) {
           const fechaDesbloqueo = new Date(data.bloqueadoHasta);
           const hora = fechaDesbloqueo.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          
           toast.error('Cuenta bloqueada por seguridad', {
             description: `Demasiados intentos. Intenta nuevamente a las ${hora}.`
           });
-        } 
-        else if (data.intentosFallidos !== undefined && data.intentosFallidos > 0) {
+        } else if (data.intentosFallidos !== undefined && data.intentosFallidos > 0) {
           toast.error(data.mensaje || 'Credenciales incorrectas', {
             description: `Llevas ${data.intentosFallidos} intento(s) fallido(s).`
           });
-        } 
-        else {
+        } else {
           toast.error(data.mensaje || 'Credenciales incorrectas.', {
             description: 'Por favor verifica tu correo y contraseña.'
           });
         }
-        
         setIsLoading(false);
-        return; 
+        return;
       }
 
-      // Guardamos la información del usuario en el navegador
       localStorage.setItem('token', data.token);
       localStorage.setItem('nombreCompleto', data.nombreCompleto);
       localStorage.setItem('rol', data.rol);
-      
-      // ¡AQUÍ ESTÁ LA MAGIA!: Guardamos el último acceso (puede ser la fecha o 'null')
       localStorage.setItem('ultimoAcceso', data.ultimoAcceso);
-      
+
       toast.success(`¡Bienvenido, ${data.nombreCompleto}!`);
-      
-      // Redirigimos al dashboard. (Si ultimoAcceso es null, el Router de App.jsx lo interceptará)
       navigate('/dashboard/inicio');
 
     } catch (err) {
@@ -84,18 +74,13 @@ function Login() {
       </div>
 
       <div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-3xl min-h-[480px] z-20">
-        
-        {/* ================= BANNER IZQUIERDO ================= */}
         <div className="hidden md:flex md:w-5/12 relative">
           <img 
             src={imagenFondo}
             alt="Fondo Institucional UMA" 
             className="absolute inset-0 w-full h-full object-cover"
           />
-          {/* Un gradiente oscuro pero suave para no matar la foto */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-          
-          {/* Texto elegante y formal */}
           <div className="relative z-10 p-10 w-full h-full flex flex-col justify-end">
             <div className="text-white">
               <h3 className="text-2xl font-semibold tracking-wide mb-2 drop-shadow-md">
@@ -107,9 +92,7 @@ function Login() {
             </div>
           </div>
         </div>
-        {/* ============================================================== */}
 
-        {/* Formulario derecho */}
         <div className="w-full md:w-7/12 p-8 sm:p-10 md:p-16 flex flex-col justify-center relative z-20 bg-white">
           <h2 className="text-5xl font-inder font-normal text-black mb-2">Iniciar sesión</h2>
           <p className="text-gray-400 text-sm mb-8">Ingresa tus credenciales institucionales.</p>
