@@ -48,6 +48,8 @@ function Login() {
         return;
       }
 
+      localStorage.clear();
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('nombreCompleto', data.nombreCompleto);
       localStorage.setItem('rol', data.rol);
