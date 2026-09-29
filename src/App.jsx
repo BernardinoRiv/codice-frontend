@@ -3,11 +3,16 @@ import { Toaster } from 'sonner';
 import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
 import DashboardLayout from './components/DashboardLayout';
+
+import Inicio from './pages/inicio/Inicio'; 
+
 import IngresoNotas from './pages/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
+import ListaDocentes from './pages/docentes/ListaDocentes';
 import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/Ajustes';
+import AperturaSeccion from './pages/AperturaSeccion'; 
 
 const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -45,12 +50,21 @@ function App() {
           </RutaProtegida>
         }>
           <Route index element={<Navigate to="inicio" replace />} />
-          <Route path="inicio" element={<div className="p-4 text-2xl font-bold">Vista de Inicio en construcción</div>} />
+          
+          {/* 👇 2. Reemplazamos el div por nuestro componente <Inicio /> */}
+          <Route path="inicio" element={<Inicio />} />
+          
           <Route path="clases" element={<div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>} />
           <Route path="notas" element={<IngresoNotas />} />
           <Route path="mis-notas" element={<ConsultaNotas />} />
+          
+          {/* <-- RUTAS DE DOCENTES Y EMPLEADOS --> */}
           <Route path="registro-docente" element={<RegistroDocente />} />
+          <Route path="directorio-docentes" element={<ListaDocentes />} />
           <Route path="registro-empleados" element={<RegistroEmpleado />} />
+          
+          <Route path="oferta-academica" element={<AperturaSeccion />} />
+          
           <Route path="asistencias" element={<div className="p-4 text-2xl font-bold">Vista de Asistencias en construcción</div>} />
           <Route path="ajustes" element={<Ajustes />} />
         </Route>
