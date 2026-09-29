@@ -6,13 +6,13 @@ import DashboardLayout from './components/DashboardLayout';
 
 import Inicio from './pages/inicio/Inicio'; 
 
-import IngresoNotas from './pages/IngresoNotas';
+import IngresoNotas from './pages/docentes/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
 import ListaDocentes from './pages/docentes/ListaDocentes';
 import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
-import Ajustes from './pages/Ajustes';
-import AperturaSeccion from './pages/AperturaSeccion'; 
+import Ajustes from './pages/perfil/Ajustes';
+import AperturaSeccion from './pages/academico/AperturaSeccion'; 
 
 const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
