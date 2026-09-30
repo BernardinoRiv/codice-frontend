@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import apiInterceptor from '../services/apiInterceptor';
+import apiInterceptor from '../../services/apiInterceptor';
 
 const Ajustes = () => {
   const [activeTab, setActiveTab] = useState('seguridad');

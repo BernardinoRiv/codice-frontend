@@ -30,6 +30,7 @@ Interfaz de usuario desarrollada en React para la gestión del Sistema de Regist
 * **Menú dinámico:** Navegación basada en roles de usuario (DOCENTE, ESTUDIANTE, ADMINISTRADOR, FINANZAS, REGISTRO_ACADEMICO)
 * **Detección de dispositivo móvil:** Adaptación automática de la interfaz
 * **Información de usuario:** Visualización de nombre, rol e iniciales en sidebar
+* **Renderizado jerárquico:** Controlador centralizado en la vista de inicio que evalúa múltiples roles del usuario y renderiza dinámicamente el panel correspondiente al cargo.
 
 ### 4. Gestión Académica - Docentes
 * **Ingreso de notas:** Interfaz para captura individual de calificaciones
@@ -39,6 +40,7 @@ Interfaz de usuario desarrollada en React para la gestión del Sistema de Regist
 
 ### 5. Gestión de Usuarios
 * **Registro de docentes:** Formulario completo con validaciones, stepper visual y vista previa en tiempo real
+* **Directorio de docentes:** Listado centralizado para la consulta de perfiles y datos de contacto del personal académico.
 * **Registro de empleados:** Formulario para personal administrativo con áreas y cargos
 * **Validaciones:** Restricción de edad mínima (18 años), máscara para DUI, campos obligatorios
 
@@ -61,18 +63,29 @@ src/
 │   └── DashboardLayout.jsx    # Layout principal con navegación
 ├── config/              # Configuraciones globales
 │   └── menuConfig.jsx         # Definición de menú por roles
-── pages/               # Vistas principales
+├── pages/               # Vistas principales
+│   ├── academico/       # Tareas de gestión y administración
+│   │   └── AperturaSeccion.jsx
 │   ├── auth/            # Autenticación
-│   │   ├── Login.jsx
-│   │   └── ForzarPassword.jsx
+│   │   ├── ForzarPassword.jsx
+│   │   └── Login.jsx
 │   ├── docentes/        # Módulo docentes
+│   │   ├── IngresoNotas.jsx
+│   │   ├── ListaDocentes.jsx
 │   │   └── RegistroDocente.jsx
 │   ├── empleados/       # Módulo empleados
 │   │   └── RegistroEmpleado.jsx
-│   └── estudiantes/     # Módulo estudiantes
-│       ├── ConsultaNotas.jsx
-│       ├── Ajustes.jsx
-│       └── IngresoNotas.jsx
+│   ├── estudiantes/     # Módulo estudiantes
+│   │   └── ConsultaNotas.jsx
+│   ├── inicio/          # Módulo de Dashboards por Rol
+│   │   ├── Inicio.jsx                 # Controlador jerárquico maestro
+│   │   ├── InicioAdministrador.jsx
+│   │   ├── InicioDocente.jsx
+│   │   ├── InicioEmpleado.jsx
+│   │   ├── InicioEstudiante.jsx
+│   │   └── InicioFinanzas.jsx
+│   └── perfil/          # Configuración de cuenta de usuario
+│       └── Ajustes.jsx
 ├── services/            # Servicios y utilidades HTTP
 │   └── apiInterceptor.js      # Interceptor global de peticiones
 ├── utils/               # Utilidades generales
