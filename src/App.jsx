@@ -18,7 +18,8 @@ const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
   const ultimoAcceso = localStorage.getItem('ultimoAcceso');
   if (!token) return <Navigate to="/" replace />;
-  if (!ultimoAcceso || ultimoAcceso === 'null') return <Navigate to="/forzar-password" replace />;
+  // 👇 AQUÍ ESTÁ LA CORRECCIÓN: Agregamos la validación de 'undefined'
+  if (!ultimoAcceso || ultimoAcceso === 'null' || ultimoAcceso === 'undefined') return <Navigate to="/forzar-password" replace />;
   return children;
 };
 
@@ -26,7 +27,8 @@ const RutaCambioPassword = ({ children }) => {
   const token = localStorage.getItem('token');
   const ultimoAcceso = localStorage.getItem('ultimoAcceso');
   if (!token) return <Navigate to="/" replace />;
-  if (ultimoAcceso && ultimoAcceso !== 'null') return <Navigate to="/dashboard" replace />;
+  // 👇 AQUÍ ESTÁ LA CORRECCIÓN: Agregamos la validación de 'undefined'
+  if (ultimoAcceso && ultimoAcceso !== 'null' && ultimoAcceso !== 'undefined') return <Navigate to="/dashboard" replace />;
   return children;
 };
 
