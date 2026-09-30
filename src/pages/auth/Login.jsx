@@ -53,8 +53,16 @@ function Login() {
       localStorage.setItem('rol', data.rol);
       localStorage.setItem('ultimoAcceso', data.ultimoAcceso);
 
-      toast.success(`¡Bienvenido, ${data.nombreCompleto}!`);
-      navigate('/dashboard/inicio');
+      // Evaluación del primer inicio de sesión con validación estricta
+      if (!data.ultimoAcceso || String(data.ultimoAcceso) === 'null' || String(data.ultimoAcceso) === 'undefined') {
+        toast.info('Primer ingreso detectado', {
+          description: 'Por seguridad institucional, debes cambiar tu contraseña.'
+        });
+        navigate('/forzar-password');
+      } else {
+        toast.success(`¡Bienvenido, ${data.nombreCompleto}!`);
+        navigate('/dashboard/inicio');
+      }
 
     } catch (err) {
       toast.error('Error de conexión', {
