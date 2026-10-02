@@ -2,7 +2,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export const generarPDFNotas = (datosCiclo, estudiante, horario) => {
-  const doc = new jsPDF('landscape', 'mm', 'letter');
+  // Configuración en orientación Vertical (Portrait)
+  const doc = new jsPDF('p', 'mm', 'letter');
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -16,52 +17,51 @@ export const generarPDFNotas = (datosCiclo, estudiante, horario) => {
   doc.text('ADMINISTRACIÓN ACADÉMICA', pageWidth / 2, 22, { align: 'center' });
   
   doc.setFontSize(11);
-  doc.text('REPORTE DE CALIFICACIONES - CICLO ACTUAL', pageWidth / 2, 28, { align: 'center' });
+  doc.text('BOLETA DE CALIFICACIONES', pageWidth / 2, 28, { align: 'center' });
 
   // Línea separadora
   doc.setLineWidth(0.5);
   doc.line(15, 32, pageWidth - 15, 32);
 
-  // Datos del estudiante
+  // Datos del estudiante estructurados en 2 columnas para evitar solapamientos
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  
   const startY = 38;
-  const leftX = 15;
-  const midX = pageWidth / 2;
+  const col1X = 15;
+  const col2X = pageWidth / 2 + 10; // Columna derecha
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Carnet:', leftX, startY);
+  doc.text('Carnet:', col1X, startY);
   doc.setFont('helvetica', 'normal');
-  doc.text(estudiante.carnet || 'SA00000000', leftX + 20, startY);
+  doc.text(estudiante.carnet || 'SA00000000', col1X + 16, startY);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Nombre:', leftX, startY + 6);
+  doc.text('Nombre:', col1X, startY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(estudiante.nombre || '', leftX + 20, startY + 6);
+  doc.text(estudiante.nombre || '', col1X + 16, startY + 6);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Carrera:', leftX, startY + 12);
+  doc.text('Carrera:', col1X, startY + 12);
   doc.setFont('helvetica', 'normal');
-  doc.text(estudiante.carrera || 'Lic. en Informática', leftX + 20, startY + 12);
+  doc.text(estudiante.carrera || 'No asignada', col1X + 16, startY + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Ciclo:', midX, startY);
+  doc.text('Ciclo:', col2X, startY);
   doc.setFont('helvetica', 'normal');
-  doc.text(datosCiclo.ciclo || '', midX + 15, startY);
+  doc.text(datosCiclo.ciclo || '', col2X + 28, startY);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('CUM:', midX, startY + 6);
+  doc.text('CUM:', col2X, startY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(Number(estudiante.cum).toFixed(1) || '0.0', midX + 15, startY + 6);
+  doc.text(Number(estudiante.cum).toFixed(1) || '0.0', col2X + 28, startY + 6);
 
+  // Ajuste de offset X para evitar que se monte encima del número
   doc.setFont('helvetica', 'bold');
-  doc.text('UV Acumuladas:', midX, startY + 12);
+  doc.text('UV Acumuladas:', col2X, startY + 12);
   doc.setFont('helvetica', 'normal');
-  doc.text(estudiante.uv?.toString() || '0', midX + 15, startY + 12);
+  doc.text(estudiante.uv?.toString() || '0', col2X + 28, startY + 12);
 
-  // Tabla de calificaciones
-  const headers = [['Materia', 'Código', 'Lab 1', 'Par 1', 'Lab 2', 'Par 2', 'Lab 3', 'Par 3', 'Promedio', 'Nota Oficial']];
+  // Tabla de calificaciones abreviada para ajustarse al formato Portrait
+  const headers = [['Materia', 'Cód.', 'L1', 'P1', 'L2', 'P2', 'L3', 'P3', 'Promedio', 'Oficial']];
   
   const body = datosCiclo.materias.map(m => [
     m.nombre,
@@ -96,16 +96,16 @@ export const generarPDFNotas = (datosCiclo, estudiante, horario) => {
       fillColor: [245, 245, 245]
     },
     columnStyles: {
-      0: { cellWidth: 55, halign: 'left' },
-      1: { cellWidth: 18, halign: 'center' },
-      2: { cellWidth: 15, halign: 'center' },
-      3: { cellWidth: 15, halign: 'center' },
-      4: { cellWidth: 15, halign: 'center' },
-      5: { cellWidth: 15, halign: 'center' },
-      6: { cellWidth: 15, halign: 'center' },
-      7: { cellWidth: 15, halign: 'center' },
-      8: { cellWidth: 20, halign: 'center' },
-      9: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
+      0: { cellWidth: 50, halign: 'left' },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 12, halign: 'center' },
+      3: { cellWidth: 12, halign: 'center' },
+      4: { cellWidth: 12, halign: 'center' },
+      5: { cellWidth: 12, halign: 'center' },
+      6: { cellWidth: 12, halign: 'center' },
+      7: { cellWidth: 12, halign: 'center' },
+      8: { cellWidth: 19, halign: 'center' },
+      9: { cellWidth: 18, halign: 'center', fontStyle: 'bold' }
     },
     margin: { left: 15, right: 15 }
   });
@@ -140,25 +140,25 @@ export const generarPDFNotas = (datosCiclo, estudiante, horario) => {
       headStyles: {
         fillColor: [30, 30, 30],
         textColor: [255, 255, 255],
-        fontSize: 8,
+        fontSize: 7,
         fontStyle: 'bold',
         halign: 'center'
       },
       bodyStyles: {
-        fontSize: 8,
+        fontSize: 7,
         textColor: [40, 40, 40]
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245]
       },
       columnStyles: {
-        0: { cellWidth: 55, halign: 'left' },
-        1: { cellWidth: 35, halign: 'center' },
-        2: { cellWidth: 35, halign: 'center' },
-        3: { cellWidth: 35, halign: 'center' },
-        4: { cellWidth: 35, halign: 'center' },
-        5: { cellWidth: 35, halign: 'center' },
-        6: { cellWidth: 35, halign: 'center' }
+        0: { cellWidth: 45, halign: 'left' },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'center' }
       },
       margin: { left: 15, right: 15 }
     });
@@ -171,12 +171,13 @@ export const generarPDFNotas = (datosCiclo, estudiante, horario) => {
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
   doc.text(
-    `Fecha de consulta: ${new Date().toLocaleDateString('es-SV')} ${new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`,
+    `Boleta generada el: ${new Date().toLocaleDateString('es-SV')} ${new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`,
     pageWidth - 15,
     pageHeight - 10,
     { align: 'right' }
   );
 
-  // Guardar
-  doc.save(`calificaciones_${datosCiclo.ciclo}_${estudiante.carnet}.pdf`);
+  // Nombre de archivo limpio y estructurado (Ej: Boleta_Notas_Carlos_Estrada_INF001.pdf)
+  const nombreLimpio = (estudiante.nombre || 'Estudiante').replace(/\s+/g, '_');
+  doc.save(`Boleta_Notas_${nombreLimpio}_${estudiante.carnet}.pdf`);
 };
