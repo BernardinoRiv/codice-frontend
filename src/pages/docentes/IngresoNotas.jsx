@@ -16,9 +16,10 @@ const IngresoNotas = () => {
 
   const [mostrarModalCarga, setMostrarModalCarga] = useState(false);
   const [datosPrevisualizacion, setDatosPrevisualizacion] = useState([]);
+  const [evaluacionesEnPrevisualizacion, setEvaluacionesEnPrevisualizacion] = useState([]);
   const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
   const [cargandoArchivo, setCargandoArchivo] = useState(false);
-  const [descargandoPlantilla, setDescargandoPlantilla] = useState(false);
+  const [descargandoDocumento, setDescargandoDocumento] = useState(false);
   const inputArchivoRef = useRef(null);
 
   useEffect(() => {
@@ -275,33 +276,43 @@ const IngresoNotas = () => {
     }
   };
 
-  const descargarPlantilla = async () => {
+  const descargarDocumentoNotas = async () => {
     if (!grupoSeleccionado) return toast.error('Selecciona un grupo primero');
     
-    setDescargandoPlantilla(true);
+    setDescargandoDocumento(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/calificaciones/plantilla/${grupoSeleccionado}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) throw new Error('Error al descargar la plantilla');
+      if (!response.ok) throw new Error('Error al descargar el documento');
+
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `Documento_Notas_Grupo_${grupoSeleccionado}.xlsx`;
+      
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        if (matches != null && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Plantilla_Notas_Grupo_${grupoSeleccionado}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
-      toast.success('Plantilla descargada', { description: 'Completa las notas y súbela cuando esté lista.' });
+      toast.success('Documento descargado', { description: 'Completa las notas y súbelo cuando esté listo.' });
     } catch (error) {
       toast.error('Error al descargar', { description: error.message });
     } finally {
-      setDescargandoPlantilla(false);
+      setDescargandoDocumento(false);
     }
   };
 
@@ -336,24 +347,23 @@ const IngresoNotas = () => {
         }
 
         const primeraFila = datosJson[0];
-        const esPlantillaValida = 
+        const esDocumentoValido = 
           primeraFila[0]?.toString().toUpperCase().includes('CARNET') &&
           primeraFila[1]?.toString().toUpperCase().includes('ESTUDIANTE');
 
-        if (!esPlantillaValida) {
-          toast.error('Estructura inválida', { description: 'El archivo no corresponde a una plantilla oficial. Descarga la plantilla desde el sistema.' });
+        if (!esDocumentoValido) {
+          toast.error('Estructura inválida', { description: 'El archivo no corresponde a un documento oficial. Descarga el documento desde el sistema.' });
           e.target.value = '';
           return;
         }
 
         const columnasEsperadas = 2 + evaluaciones.length;
         if (primeraFila.length !== columnasEsperadas) {
-          toast.error('Plantilla incorrecta', { description: `Se esperaban ${columnasEsperadas} columnas, pero el archivo tiene ${primeraFila.length}. Descarga la plantilla actualizada.` });
+          toast.error('Documento incorrecto', { description: `Se esperaban ${columnasEsperadas} columnas, pero el archivo tiene ${primeraFila.length}. Descarga el documento actualizado.` });
           e.target.value = '';
           return;
         }
 
-        // Mapear evaluaciones activas a sus columnas en el Excel
         const mapaEvaluaciones = {};
         for (let i = 2; i < primeraFila.length; i++) {
           const encabezado = primeraFila[i]?.toString().toUpperCase().trim() || '';
@@ -368,7 +378,6 @@ const IngresoNotas = () => {
           }
         }
 
-        // Obtener solo las columnas de las evaluaciones activas
         const evaluacionesActivas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
         const columnasActivas = evaluacionesActivas.map(ev => {
           const key = `${ev.tipoEvaluacion}_${ev.numeroEvaluacion}`;
@@ -391,23 +400,79 @@ const IngresoNotas = () => {
           return;
         }
 
-        // Estructurar previsualización SOLO con las evaluaciones activas
+        const columnasConCambios = columnasActivas.filter(col => {
+           return filasDatos.some(fila => {
+              const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
+              const inscripcionEst = inscripciones.find(i => i.carnet.toLowerCase() === carnetStr);
+              if (!inscripcionEst) return false;
+
+              const excelVal = fila[col.indiceColumna];
+              const tieneValorExcel = excelVal !== undefined && excelVal !== null && excelVal !== '';
+              
+              const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
+              const califActual = calificaciones[califKey];
+              
+              if (califActual && califActual.estadoCalificacion === 'PUBLICADA') return false; 
+
+              if (tieneValorExcel) {
+                  if (!califActual || califActual.nota === null || califActual.nota === '') return true;
+                  if (Number(excelVal).toFixed(1) !== Number(califActual.nota).toFixed(1)) return true;
+              }
+              return false; 
+           });
+        });
+
+        if (columnasConCambios.length === 0) {
+           toast.info('Sin modificaciones útiles', { description: 'El documento no contiene notas nuevas, y las existentes ya están publicadas o no cambiaron.' });
+           e.target.value = '';
+           return;
+        }
+
         const previsualizacion = filasDatos.map((fila, idx) => {
-          const notasActivas = columnasActivas.map(col => {
+          const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
+          const inscripcionEst = inscripciones.find(i => i.carnet.toLowerCase() === carnetStr);
+
+          const notasAMostrar = columnasConCambios.map(col => {
             const valor = fila[col.indiceColumna];
-            return valor !== undefined && valor !== null && valor !== '' ? valor : null;
+            let estado = 'vacio';
+            
+            if (inscripcionEst) {
+               const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
+               const califActual = calificaciones[califKey];
+               
+               if (califActual && califActual.estadoCalificacion === 'PUBLICADA') {
+                  estado = 'publicada';
+               } else {
+                  const tieneValorExcel = valor !== undefined && valor !== null && valor !== '';
+                  if (tieneValorExcel) {
+                     if (!califActual || califActual.nota === null || califActual.nota === '') {
+                        estado = 'nuevo';
+                     } else if (Number(valor).toFixed(1) !== Number(califActual.nota).toFixed(1)) {
+                        estado = 'modificado';
+                     } else {
+                        estado = 'sin_cambio';
+                     }
+                  }
+               }
+            }
+
+            return {
+              valor: valor !== undefined && valor !== null && valor !== '' ? valor : null,
+              estado
+            };
           });
 
           return {
             fila: idx + 2,
             carnet: fila[0] || '',
             estudiante: fila[1] || '',
-            notas: notasActivas
+            notas: notasAMostrar
           };
         });
 
         setArchivoSeleccionado(archivo);
         setDatosPrevisualizacion(previsualizacion);
+        setEvaluacionesEnPrevisualizacion(columnasConCambios.map(c => c.evaluacion));
         setMostrarModalCarga(true);
       } catch (error) {
         toast.error('Error al leer el archivo', { description: 'El archivo está corrupto o tiene un formato inválido.' });
@@ -437,10 +502,11 @@ const IngresoNotas = () => {
         throw new Error(errorData.message || 'Error al cargar las notas');
       }
 
-      toast.success('Notas cargadas exitosamente', { description: `${datosPrevisualizacion.length} registros procesados.` });
+      toast.success('Notas cargadas exitosamente', { description: 'Los registros fueron procesados correctamente.' });
       setMostrarModalCarga(false);
       setArchivoSeleccionado(null);
       setDatosPrevisualizacion([]);
+      setEvaluacionesEnPrevisualizacion([]);
       cargarDatosGrupo();
     } catch (error) {
       toast.error('Error al cargar notas', { description: error.message });
@@ -453,6 +519,7 @@ const IngresoNotas = () => {
     setMostrarModalCarga(false);
     setArchivoSeleccionado(null);
     setDatosPrevisualizacion([]);
+    setEvaluacionesEnPrevisualizacion([]);
   };
 
   const periodosUnicos = [...new Set(evaluaciones.map(ev => ev.periodo).filter(p => p !== null && p !== undefined))].sort();
@@ -531,16 +598,16 @@ const IngresoNotas = () => {
                   }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                  Cargar Notas
+                  Importar Notas
                 </button>
                 
                 <button 
                   type="button" 
-                  onClick={descargarPlantilla} 
-                  disabled={descargandoPlantilla}
+                  onClick={descargarDocumentoNotas} 
+                  disabled={descargandoDocumento}
                   className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-70 disabled:cursor-wait transition-colors text-sm font-medium border border-gray-200 shadow-sm"
                 >
-                  {descargandoPlantilla ? (
+                  {descargandoDocumento ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-700 border-t-transparent"></div>
                       Preparando...
@@ -548,7 +615,7 @@ const IngresoNotas = () => {
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                      Descargar Plantilla
+                      Exportar Documento
                     </>
                   )}
                 </button>
@@ -621,7 +688,7 @@ const IngresoNotas = () => {
                               const calif = calificaciones[key];
                               
                               const estaPublicada = calif?.estadoCalificacion === 'PUBLICADA';
-                              const estaBloqueado = !estado.puedeEditar || !modoEdicionGlobal;
+                              const estaBloqueado = !estado.puedeEditar || !modoEdicionGlobal || estaPublicada;
                               const tieneNota = calif?.nota !== null && calif?.nota !== undefined && calif?.nota !== '';
                               const esBorrador = tieneNota && !estaPublicada;
 
@@ -646,7 +713,7 @@ const IngresoNotas = () => {
                                     value={calif?.nota ?? ''}
                                     onChange={(e) => handleNotaChange(inscripcion.idInscripcion, evalItem.idEvaluacion, e.target.value)}
                                     disabled={estaBloqueado}
-                                    title={estaBloqueado ? (estaPublicada ? 'Calificación oficial' : 'Haz clic en Habilitar Edición abajo') : 'Editando nota'}
+                                    title={estaPublicada ? 'Calificación oficial. Solicita permisos para modificar.' : (estaBloqueado ? 'Haz clic en Habilitar Edición abajo' : 'Editando nota')}
                                     className={`w-16 text-center rounded-lg px-2 py-1.5 text-sm font-bold transition-all outline-none border ${colorClass} ${borderClass}`}
                                   />
                                 </td>
@@ -730,9 +797,9 @@ const IngresoNotas = () => {
                       {datosPrevisualizacion.length} registros
                     </span>
                   </p>
-                  {evaluacionesActivas.length > 0 && (
-                    <p className="text-xs text-green-600 mt-1 font-medium">
-                      Evaluaciones activas: {evaluacionesActivas.map(ev => `${ev.tipoEvaluacion === 'LABORATORIO' ? 'LAB' : ev.tipoEvaluacion} ${ev.numeroEvaluacion}`).join(', ')}
+                  {evaluacionesEnPrevisualizacion.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1 font-medium">
+                      Columnas con cambios detectados: {evaluacionesEnPrevisualizacion.map(ev => `${ev.tipoEvaluacion === 'LABORATORIO' ? 'LAB' : ev.tipoEvaluacion} ${ev.numeroEvaluacion}`).join(', ')}
                     </p>
                   )}
                 </div>
@@ -750,7 +817,7 @@ const IngresoNotas = () => {
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-16">Fila</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-32">Carnet</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200">Estudiante</th>
-                      {evaluacionesActivas.map((ev, idx) => (
+                      {evaluacionesEnPrevisualizacion.map((ev, idx) => (
                         <th key={idx} className="px-4 py-3 text-center text-xs font-bold text-blue-600 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
                           {ev.tipoEvaluacion === 'LABORATORIO' ? 'LAB' : ev.tipoEvaluacion} {ev.numeroEvaluacion}
                         </th>
@@ -769,17 +836,37 @@ const IngresoNotas = () => {
                         <td className="px-4 py-3 border-r border-gray-100 font-medium text-gray-900">
                           {fila.estudiante || <span className="text-gray-400 italic">Sin nombre</span>}
                         </td>
-                        {fila.notas.map((nota, nIdx) => {
-                          if (nIdx >= evaluacionesActivas.length) return null;
+                        {fila.notas.map((notaObj, nIdx) => {
+                          if (notaObj.estado === 'publicada') {
+                             return (
+                               <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0 bg-gray-50/50">
+                                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 text-gray-500 border border-gray-300" title="Nota oficial (se omitirá)">
+                                    {notaObj.valor !== null ? Number(notaObj.valor).toFixed(1) : '-'}
+                                  </span>
+                               </td>
+                             );
+                          }
+                          if (notaObj.estado === 'sin_cambio') {
+                             return (
+                               <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0">
+                                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-50 text-gray-400 border border-gray-100" title="Sin cambios respecto al borrador actual">
+                                    {Number(notaObj.valor).toFixed(1)}
+                                  </span>
+                               </td>
+                             );
+                          }
+                          if (notaObj.estado === 'vacio') {
+                             return (
+                               <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0">
+                                  <span className="text-gray-300 text-xs font-medium">-</span>
+                               </td>
+                             );
+                          }
                           return (
                             <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0">
-                              {nota !== null && nota !== undefined && nota !== '' ? (
-                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  {Number(nota).toFixed(1)}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300 text-xs">-</span>
-                              )}
+                               <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200" title={notaObj.estado === 'nuevo' ? "Se guardará como borrador nuevo" : "Modificará un borrador existente"}>
+                                 {Number(notaObj.valor).toFixed(1)}
+                               </span>
                             </td>
                           );
                         })}
@@ -789,15 +876,15 @@ const IngresoNotas = () => {
                 </table>
               </div>
 
-              <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <div className="text-xs text-amber-800">
-                  <p className="font-semibold">Antes de continuar, verifica:</p>
+              <div className="mt-4 flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="text-xs text-blue-800">
+                  <p className="font-semibold">Filtro Inteligente Activo:</p>
                   <ul className="list-disc list-inside mt-1 space-y-0.5">
-                    <li>Solo se cargarán las notas de las <strong>evaluaciones activas</strong> mostradas arriba.</li>
-                    <li>Las celdas vacías <strong>no modificarán</strong> las notas existentes.</li>
-                    <li>Solo se aceptan notas con <strong>1 decimal</strong> entre 0.0 y 10.0.</li>
-                    <li>Las notas cargadas quedarán en estado <strong>borrador</strong>.</li>
+                    <li>La previsualización <strong>solo muestra columnas que detectan notas nuevas o modificadas</strong>.</li>
+                    <li>Las notas marcadas en <span className="text-orange-700 font-bold">naranja</span> se subirán al sistema como borradores.</li>
+                    <li>Las notas en <strong>gris oscuro</strong> están publicadas y se ignorarán automáticamente.</li>
+                    <li>Las notas en <span className="text-gray-400 font-bold">gris claro</span> coinciden con el borrador actual y no generarán cambios.</li>
                   </ul>
                 </div>
               </div>
