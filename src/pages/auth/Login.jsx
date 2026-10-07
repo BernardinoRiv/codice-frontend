@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import imagenFondo from '../../IMG_1534.JPG.jpeg';
@@ -147,9 +147,9 @@ function Login() {
             </div>
 
             <div className="flex justify-end text-sm mt-2 mb-6">
-              <a href="#" className="text-gray-500 hover:text-black transition">
+              <Link to="/recuperar-password" className="text-gray-500 hover:text-black transition">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
 
             <motion.button
