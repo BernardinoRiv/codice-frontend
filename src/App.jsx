@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
+import RecuperarPassword from './pages/auth/RecuperarPassword';
 import DashboardLayout from './components/DashboardLayout';
 
 import Inicio from './pages/inicio/Inicio'; 
@@ -37,14 +38,18 @@ function App() {
       <Toaster richColors position="top-right" toastOptions={{ className: 'mt-2 sm:mt-4', style: { borderRadius: '16px', padding: '16px' } }} />
 
       <Routes>
+        {/* === RUTAS PÚBLICAS === */}
         <Route path="/" element={<Login />} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
 
+        {/* === RUTA SEMI-PROTEGIDA === */}
         <Route path="/forzar-password" element={
           <RutaCambioPassword>
             <ForzarPassword />
           </RutaCambioPassword>
         } />
 
+        {/* === RUTAS PROTEGIDAS (DASHBOARD) === */}
         <Route path="/dashboard" element={
           <RutaProtegida>
             <DashboardLayout />
@@ -52,26 +57,23 @@ function App() {
         }>
           <Route index element={<Navigate to="inicio" replace />} />
           
-          {/*  2. Reemplazamos el div por nuestro componente <Inicio /> */}
           <Route path="inicio" element={<Inicio />} />
-          
           <Route path="clases" element={<div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>} />
           <Route path="notas" element={<IngresoNotas />} />
           <Route path="mis-notas" element={<ConsultaNotas />} />
           
-          {/* <-- RUTAS DE DOCENTES Y EMPLEADOS --> */}
           <Route path="registro-docente" element={<RegistroDocente />} />
           <Route path="directorio-docentes" element={<ListaDocentes />} />
           <Route path="registro-empleados" element={<RegistroEmpleado />} />
           
           <Route path="oferta-academica" element={<AperturaSeccion />} />
-          {/*  Agrega esta línea para el módulo de Finanzas */}
           <Route path="pagos" element={<VentanillaPagos />} />
           
           <Route path="asistencias" element={<div className="p-4 text-2xl font-bold">Vista de Asistencias en construcción</div>} />
           <Route path="ajustes" element={<Ajustes />} />
         </Route>
 
+        {/* RUTAS NO ENCONTRADAS */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
