@@ -13,6 +13,7 @@ import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/perfil/Ajustes';
 import AperturaSeccion from './pages/academico/AperturaSeccion'; 
+import VentanillaPagos from './pages/finanzas/VentanillaPagos';
 
 const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -51,7 +52,7 @@ function App() {
         }>
           <Route index element={<Navigate to="inicio" replace />} />
           
-          {/* 👇 2. Reemplazamos el div por nuestro componente <Inicio /> */}
+          {/*  2. Reemplazamos el div por nuestro componente <Inicio /> */}
           <Route path="inicio" element={<Inicio />} />
           
           <Route path="clases" element={<div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>} />
@@ -64,6 +65,8 @@ function App() {
           <Route path="registro-empleados" element={<RegistroEmpleado />} />
           
           <Route path="oferta-academica" element={<AperturaSeccion />} />
+          {/*  Agrega esta línea para el módulo de Finanzas */}
+          <Route path="pagos" element={<VentanillaPagos />} />
           
           <Route path="asistencias" element={<div className="p-4 text-2xl font-bold">Vista de Asistencias en construcción</div>} />
           <Route path="ajustes" element={<Ajustes />} />
