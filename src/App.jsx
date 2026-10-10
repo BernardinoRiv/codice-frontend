@@ -15,6 +15,8 @@ import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/perfil/Ajustes';
 import AperturaSeccion from './pages/academico/AperturaSeccion'; 
 import VentanillaPagos from './pages/finanzas/VentanillaPagos';
+import Asistencias from './pages/docentes/Asistencias';
+import EscanearAsistencia from './pages/estudiantes/EscanearAsistencia';
 
 const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -71,7 +73,8 @@ function App() {
           <Route path="oferta-academica" element={<AperturaSeccion />} />
           <Route path="pagos" element={<VentanillaPagos />} />
           
-          <Route path="asistencias" element={<div className="p-4 text-2xl font-bold">Vista de Asistencias en construcción</div>} />
+          <Route path="asistencias" element={<Asistencias/>} />
+          <Route path="escanear-asistencia" element={<EscanearAsistencia/>} />
           <Route path="ajustes" element={<Ajustes />} />
         </Route>
 
