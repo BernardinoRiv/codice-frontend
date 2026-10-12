@@ -16,7 +16,7 @@ function AperturaSeccion() {
   // Listas que dependen de una selección previa (Cascada)
   const [materias, setMaterias] = useState([]);
   const [aulas, setAulas] = useState([]);
-  const [isLoadingCascada, setIsLoadingCascada] = useState({ materias: false, aulas: false });
+  const [isLoadingCascada, setIsLoadingCascada] = useState({ materias: false, aulas: false, carreras: false });
 
   // ==========================================
   // ESTADO DEL FORMULARIO
@@ -34,35 +34,51 @@ function AperturaSeccion() {
     cupoVirtual: 40
   });
 
-  // Carga inicial de todos los catálogos estáticos
+  // Carga inicial de todos los catálogos estáticos (Corregido para evitar el Error 400)
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        const [resGral, resDocentes, resPlantillas] = await Promise.all([
-          // AQUÍ ESTÁ LA CORRECCIÓN: /api/v1/catalogos
-          fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=ciclos,sedes,carreras,modalidades`, { headers }),
+        // 1. Separamos las peticiones a los endpoints correctos
+        const [resCatGral, resCicloOp, resPlanificados, resDocentes, resPlantillas] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=sedes,modalidades`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/ciclos/operativo-oferta`, { headers }).catch(() => null),
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/ciclos/en-planificacion`, { headers }).catch(() => null),
           fetch(`${import.meta.env.VITE_API_URL}/api/v1/grupos/catalogos/docentes`, { headers }),
           fetch(`${import.meta.env.VITE_API_URL}/api/v1/grupos/catalogos/plantillas`, { headers })
         ]);
 
-        const dataGral = resGral.ok ? await resGral.json() : {};
+        const dataGral = resCatGral.ok ? await resCatGral.json() : {};
         const dataDocentes = resDocentes.ok ? await resDocentes.json() : [];
         const dataPlantillas = resPlantillas.ok ? await resPlantillas.json() : [];
 
+        // 2. Unificamos el ciclo operativo y los planificados
+        const ciclosCombinados = [];
+        if (resCicloOp && resCicloOp.ok) ciclosCombinados.push(await resCicloOp.json());
+        if (resPlanificados && resPlanificados.ok) {
+          const planificados = await resPlanificados.json();
+          planificados.forEach(p => {
+            if (!ciclosCombinados.find(c => c.idCiclo === p.idCiclo)) ciclosCombinados.push(p);
+          });
+        }
+
         setCatalogos({
-          ciclos: dataGral.ciclos || [],
+          ciclos: ciclosCombinados.map(c => ({ 
+            id: c.idCiclo, 
+            nombre: `${c.codigoCiclo} - ${c.estadoCiclo || 'PLANIFICACIÓN'}`, 
+            ...c 
+          })),
           sedes: dataGral.sedes || [],
-          carreras: dataGral.carreras || [],
+          carreras: [], // Se llenará dinámicamente al elegir la Sede
           modalidades: dataGral.modalidades || [],
           docentes: dataDocentes,
           plantillas: dataPlantillas
         });
 
       } catch (error) {
-        toast.error('Error de conexión', { description: 'No se pudieron descargar los catálogos.' });
+        toast.error('Error de conexión', { description: 'No se pudieron descargar los catálogos base.' });
       } finally {
         setIsLoadingCatalogos(false);
       }
@@ -70,28 +86,41 @@ function AperturaSeccion() {
     fetchCatalogos();
   }, []);
 
-  // Efecto Cascada: Sede -> Aulas físicas
+  // Efecto Cascada: Sede -> Aulas físicas Y Carreras
   useEffect(() => {
     if (!formData.idSede) {
       setAulas([]);
-      setFormData(prev => ({ ...prev, idAula: '' }));
+      setCatalogos(prev => ({ ...prev, carreras: [] }));
+      setFormData(prev => ({ ...prev, idAula: '', idCarrera: '', idMateria: '' }));
       return;
     }
-    const fetchAulas = async () => {
-      setIsLoadingCascada(prev => ({ ...prev, aulas: true }));
+
+    const fetchSedeData = async () => {
+      setIsLoadingCascada(prev => ({ ...prev, aulas: true, carreras: true }));
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/grupos/catalogos/aulas?idSede=${formData.idSede}`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        if (res.ok) setAulas(await res.json());
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const [resAulas, resCarreras] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/grupos/catalogos/aulas?idSede=${formData.idSede}`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/carreras?idSede=${formData.idSede}`, { headers })
+        ]);
+
+        if (resAulas.ok) setAulas(await resAulas.json());
+        if (resCarreras.ok) {
+          const dataCarreras = await resCarreras.json();
+          setCatalogos(prev => ({
+            ...prev,
+            carreras: dataCarreras.map(c => ({ id: c.idCarrera, nombre: c.nombreCarrera }))
+          }));
+        }
       } catch (error) {
-        toast.error('Error al cargar aulas');
+        toast.error('Error al cargar datos', { description: 'Fallo al descargar carreras y aulas de la sede.' });
       } finally {
-        setIsLoadingCascada(prev => ({ ...prev, aulas: false }));
+        setIsLoadingCascada(prev => ({ ...prev, aulas: false, carreras: false }));
       }
     };
-    fetchAulas();
+    fetchSedeData();
   }, [formData.idSede]);
 
   // Efecto Cascada: Carrera -> Materias del Pensum
@@ -180,7 +209,6 @@ function AperturaSeccion() {
       if (response.status === 201 || response.ok) {
         toast.success('¡Apertura Exitosa!', { description: `Sección ${data.codigoGrupo || codigoGenerado} guardada correctamente.` });
         
-        // Agregar al historial de la tabla inferior
         const nuevaSeccion = {
             codigoGrupo: data.codigoGrupo || codigoGenerado,
             materia: materias.find(m => m.idMateria == formData.idMateria)?.nombreMateria || 'Materia',
@@ -300,9 +328,9 @@ function AperturaSeccion() {
                   </select>
                 </div>
                 <div>
-                  <label className={labelClassName}>Pensum / Carrera</label>
-                  <select name="idCarrera" value={formData.idCarrera} onChange={handleChange} required disabled={isLoadingCatalogos} className={inputClassName}>
-                    <option value="">-- Seleccione --</option>
+                  <label className={labelClassName}>Pensum / Carrera {isLoadingCascada.carreras && <span className="animate-pulse text-blue-500 normal-case ml-2">(Cargando...)</span>}</label>
+                  <select name="idCarrera" value={formData.idCarrera} onChange={handleChange} required disabled={catalogos.carreras.length === 0} className={inputClassName}>
+                    <option value="">{catalogos.carreras.length === 0 ? '-- Elija una sede --' : '-- Seleccione --'}</option>
                     {catalogos.carreras.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
                 </div>
