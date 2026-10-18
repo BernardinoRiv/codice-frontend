@@ -20,6 +20,7 @@ import Asistencias from './pages/docentes/Asistencias';
 import EscanearAsistencia from './pages/estudiantes/EscanearAsistencia';
 import CatalogoAranceles from './pages/finanzas/CatalogoAranceles';
 import CiclosPlanificacion from './pages/academico/CiclosPlanificacion';
+import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
@@ -149,6 +150,22 @@ function App() {
         }>
           <Route index element={<Navigate to="inicio" replace />} />
           
+          <Route path="inicio" element={<Inicio />} />
+          <Route path="clases" element={<div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>} />
+          <Route path="notas" element={<IngresoNotas />} />
+          <Route path="mis-notas" element={<ConsultaNotas />} />
+          
+          <Route path="registro-docente" element={<RegistroDocente />} />
+          <Route path="directorio-docentes" element={<ListaDocentes />} />
+          <Route path="registro-empleados" element={<RegistroEmpleado />} />
+          
+          <Route path="oferta-academica" element={<AperturaSeccion />} />
+          <Route path="ciclos-planificacion" element={<CiclosPlanificacion />} />
+          <Route path="pagos" element={<VentanillaPagos />} />
+          <Route path="aranceles" element={<CatalogoAranceles />} />
+          <Route path="mi-estado-cuenta" element={<EstadoCuentaEstudiante />} />
+          <Route path="asistencias" element={<Asistencias/>} />
+          <Route path="escanear-asistencia" element={<EscanearAsistencia/>} />
           {/* Inicio y Ajustes: Accesibles para todos los roles autenticados */}
           <Route path="inicio" element={
             <RutaPorRol rolesPermitidos={['DOCENTE', 'ESTUDIANTE', 'FINANZAS', 'ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO']}>
