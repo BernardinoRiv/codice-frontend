@@ -131,10 +131,20 @@ export const menuMaestro = [
   { 
     name: 'Pagos y Aranceles', 
     path: '/dashboard/pagos', 
-    rolesPermitidos: ['ESTUDIANTE', 'FINANZAS', 'ADMINISTRADOR'], 
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V4.245c0-.754-.726-1.294-1.453-1.096A60.07 60.07 0 0 1 2.25 5.25v13.5Zm15.975 1.282A48.682 48.682 0 0 0 21 12a48.65 48.65 0 0 0-2.775-5.032M3 15.75v-7.5m0 0v-.008m0 7.508v-.008m1.5-7.5h.008v.008H4.5v-.008m0 7.5h.008v.008H4.5v-.008" />
+      </svg>
+    )
+  },
+  {
+    name: 'Mi Estado de Cuenta',
+    path: '/dashboard/mi-estado-cuenta',
+    rolesPermitidos: ['ESTUDIANTE'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
   },

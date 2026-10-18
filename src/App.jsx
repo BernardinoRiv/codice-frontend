@@ -19,6 +19,7 @@ import Asistencias from './pages/docentes/Asistencias';
 import EscanearAsistencia from './pages/estudiantes/EscanearAsistencia';
 import CatalogoAranceles from './pages/finanzas/CatalogoAranceles';
 import CiclosPlanificacion from './pages/academico/CiclosPlanificacion';
+import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 
 const RutaProtegida = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -76,6 +77,7 @@ function App() {
           <Route path="ciclos-planificacion" element={<CiclosPlanificacion />} />
           <Route path="pagos" element={<VentanillaPagos />} />
           <Route path="aranceles" element={<CatalogoAranceles />} />
+          <Route path="mi-estado-cuenta" element={<EstadoCuentaEstudiante />} />
           <Route path="asistencias" element={<Asistencias/>} />
           <Route path="escanear-asistencia" element={<EscanearAsistencia/>} />
           <Route path="ajustes" element={<Ajustes />} />
