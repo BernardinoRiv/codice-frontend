@@ -1,9 +1,6 @@
 import React from 'react';
 
 export const menuMaestro = [
-  // ==========================================
-  // 1. VISTAS GENERALES
-  // ==========================================
   { 
     name: 'Inicio', 
     path: '/dashboard/inicio', 
@@ -14,10 +11,6 @@ export const menuMaestro = [
       </svg>
     )
   },
-
-  // ==========================================
-  // 2. GESTIÓN INSTITUCIONAL (ADMIN / REGISTRO)
-  // ==========================================
   { 
     name: 'Registro Empleado', 
     path: '/dashboard/registro-empleados', 
@@ -52,7 +45,7 @@ export const menuMaestro = [
   { 
     name: 'Oferta Académica', 
     path: '/dashboard/oferta-academica', 
-    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
+    rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
@@ -62,17 +55,23 @@ export const menuMaestro = [
   {
     name: 'Ciclos en Planificación',
     path: '/dashboard/ciclos-planificacion',
-    rolesPermitidos: ['ADMINISTRADOR', 'EMPLEADO'],
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     )
   },
-
-  // ==========================================
-  // 3. GESTIÓN ACADÉMICA (AULAS Y CALIFICACIONES)
-  // ==========================================
+  { 
+    name: 'Gestión de Secciones', 
+    path: '/dashboard/gestion-secciones', 
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'], 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    )
+  },
   { 
     name: 'Mis Clases', 
     path: '/dashboard/clases', 
@@ -86,7 +85,7 @@ export const menuMaestro = [
   { 
     name: 'Asistencias', 
     path: '/dashboard/asistencias', 
-    rolesPermitidos: ['DOCENTE', 'ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
+    rolesPermitidos: ['DOCENTE'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -124,10 +123,6 @@ export const menuMaestro = [
       </svg>
     )
   },
-
-  // ==========================================
-  // 4. ADMINISTRACIÓN FINANCIERA
-  // ==========================================
   { 
     name: 'Pagos y Aranceles', 
     path: '/dashboard/pagos', 
