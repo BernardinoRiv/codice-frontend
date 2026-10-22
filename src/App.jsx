@@ -22,6 +22,7 @@ import CatalogoAranceles from './pages/finanzas/CatalogoAranceles';
 import CiclosPlanificacion from './pages/academico/CiclosPlanificacion';
 import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
+import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
 const normalizarRol = (rol = '') => {
@@ -166,6 +167,7 @@ function App() {
           <Route path="mi-estado-cuenta" element={<EstadoCuentaEstudiante />} />
           <Route path="asistencias" element={<Asistencias/>} />
           <Route path="escanear-asistencia" element={<EscanearAsistencia/>} />
+          
           {/* Inicio y Ajustes: Accesibles para todos los roles autenticados */}
           <Route path="inicio" element={
             <RutaPorRol rolesPermitidos={['DOCENTE', 'ESTUDIANTE', 'FINANZAS', 'ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO']}>
@@ -180,6 +182,12 @@ function App() {
             <RutaPorRol rolesPermitidos={['ADMINISTRADOR']}>
               <RegistroEmpleado />
             </RutaPorRol>
+          } />
+
+          <Route path="nuevo-ingreso" element={
+          <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'REGISTRO_ACADEMICO']}>
+            <RegistroNuevoIngreso />
+          </RutaPorRol>
           } />
 
           <Route path="registro-docente" element={
