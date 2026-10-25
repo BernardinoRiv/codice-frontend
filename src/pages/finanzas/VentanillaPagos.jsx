@@ -15,6 +15,7 @@ function VentanillaPagos() {
 
   const [estadoCuenta, setEstadoCuenta] = useState(null);
   const [selectedCargos, setSelectedCargos] = useState([]); 
+  const [cargosObligatorios, setCargosObligatorios] = useState([]);
   const [arancelesAgregados, setArancelesAgregados] = useState([]); 
   
   const [metodoPago, setMetodoPago] = useState('1');
@@ -60,6 +61,7 @@ function VentanillaPagos() {
     setIsSearching(true);
     setEstadoCuenta(null);
     setSelectedCargos([]);
+    setCargosObligatorios([]); 
     setArancelesAgregados([]); 
     setPagoExitoso(false);
 
@@ -71,14 +73,56 @@ function VentanillaPagos() {
 
       if (response.ok) {
         const data = await response.json();
-        setEstadoCuenta(data);
-        if (data.cargosPendientes.length === 0) {
-          toast.success('Solvente', { description: 'El estudiante no posee deudas pendientes.' });
-        } else {
-          toast.info('Deudas encontradas', { description: `El estudiante tiene ${data.cargosPendientes.length} cuotas pendientes.` });
+        
+        // ORDENAMIENTO: Forzar Matrícula al inicio, luego ordenar por fecha de vencimiento
+        if (data.cargosPendientes && data.cargosPendientes.length > 0) {
+          data.cargosPendientes.sort((a, b) => {
+            const isMatA = a.concepto.toLowerCase().includes('matrícul') || a.concepto.toLowerCase().includes('matricul');
+            const isMatB = b.concepto.toLowerCase().includes('matrícul') || b.concepto.toLowerCase().includes('matricul');
+            
+            if (isMatA && !isMatB) return -1;
+            if (!isMatA && isMatB) return 1;
+            
+            if (a.fechaVencimiento && b.fechaVencimiento) {
+              return new Date(a.fechaVencimiento) - new Date(b.fechaVencimiento);
+            }
+            return 0;
+          });
         }
+
+        setEstadoCuenta(data);
+        
+        if (data.cargosPendientes.length > 0) {
+          let obligatorios = [];
+          let preseleccionados = [];
+
+          const idxMatricula = data.cargosPendientes.findIndex(c => 
+            c.concepto.toLowerCase().includes('matrícul') || c.concepto.toLowerCase().includes('matricul')
+          );
+          
+          if (idxMatricula !== -1) {
+            obligatorios.push(data.cargosPendientes[idxMatricula].idCargo);
+            
+            const idxPrimeraCuota = data.cargosPendientes.findIndex(c => c.concepto.toLowerCase().includes('cuota'));
+            if (idxPrimeraCuota !== -1) {
+              obligatorios.push(data.cargosPendientes[idxPrimeraCuota].idCargo);
+            }
+            
+            preseleccionados = [...obligatorios];
+            toast.info('Inicio de ciclo', { description: 'Matrícula y 1.ª Cuota marcadas como requeridas.' });
+          } else {
+            preseleccionados = [data.cargosPendientes[0].idCargo];
+            toast.info('Deudas encontradas', { description: `El estudiante tiene ${data.cargosPendientes.length} cobros pendientes.` });
+          }
+          
+          setCargosObligatorios(obligatorios);
+          setSelectedCargos(preseleccionados);
+        } else {
+          toast.success('Solvente', { description: 'El estudiante no posee deudas pendientes.' });
+        }
+
       } else if (response.status === 404) {
-        toast.error('No encontrado', { description: 'No existe ningún estudiante con ese carnet.' });
+        toast.error('No encontrado', { description: 'No existe ningún estudiante/aspirante con ese identificador.' });
       } else {
         throw new Error('Error al consultar el estado de cuenta.');
       }
@@ -94,18 +138,20 @@ function VentanillaPagos() {
     let nuevosSeleccionados = [];
 
     if (isChecked) {
-      const idsAMarcar = cargos.slice(0, index + 1).map(c => c.idCargo);
-      nuevosSeleccionados = idsAMarcar;
+      nuevosSeleccionados = cargos.slice(0, index + 1).map(c => c.idCargo);
     } else {
-      const idsAMarcar = cargos.slice(0, index).map(c => c.idCargo);
-      nuevosSeleccionados = idsAMarcar;
+      nuevosSeleccionados = cargos.slice(0, index).map(c => c.idCargo);
     }
+    
+    cargosObligatorios.forEach(idObligatorio => {
+      if (!nuevosSeleccionados.includes(idObligatorio)) {
+        nuevosSeleccionados.push(idObligatorio);
+      }
+    });
+
     setSelectedCargos(nuevosSeleccionados);
   };
 
-  // ========================================================
-  // SOLUCIÓN: Bloqueo de Aranceles Duplicados
-  // ========================================================
   const handleAgregarArancel = (arancel) => {
     const yaExiste = arancelesAgregados.some(a => a.idConcepto === arancel.idConcepto);
     
@@ -130,12 +176,12 @@ function VentanillaPagos() {
   };
 
   const totalCargosFijos = estadoCuenta?.cargosPendientes
-    ?.filter(c => selectedCargos.includes(c.idCargo))
+    ?.filter(c => selectedCargos.includes(c.idCargo) || cargosObligatorios.includes(c.idCargo))
     .reduce((sum, current) => sum + current.montoTotal, 0) || 0;
 
   const totalArancelesExtras = arancelesAgregados.reduce((sum, current) => sum + current.monto, 0);
   const totalAPagar = totalCargosFijos + totalArancelesExtras;
-  const totalItemsCobrar = selectedCargos.length + arancelesAgregados.length;
+  const totalItemsCobrar = (selectedCargos.length) + arancelesAgregados.length;
 
   const formatearNombreCuota = (cargo) => {
     const conceptoLower = cargo.concepto.toLowerCase();
@@ -150,10 +196,10 @@ function VentanillaPagos() {
       if (parts.length >= 2) {
         const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
         const mesNombre = meses[parseInt(parts[1], 10) - 1];
-        return `${cargo.concepto} - cuota ${mesNombre}`;
+        return `${cargo.concepto} - Mes de ${mesNombre}`;
       }
     }
-    return `${cargo.concepto} - cuota ${cargo.numeroCuota}`;
+    return `${cargo.concepto} - Cuota ${cargo.numeroCuota}`;
   };
 
   const handleProcesarPago = async () => {
@@ -198,6 +244,7 @@ function VentanillaPagos() {
       setTimeout(() => {
         setEstadoCuenta(null);
         setSelectedCargos([]);
+        setCargosObligatorios([]);
         setArancelesAgregados([]);
         setCarnetBuscar('');
         setMetodoPago('1');
@@ -289,13 +336,13 @@ function VentanillaPagos() {
           
           <form onSubmit={buscarEstudiante} className="bg-gray-50/50 border border-gray-200/60 p-6 rounded-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-black"></div>
-            <label className={labelClassName}>Carnet del estudiante</label>
+            <label className={labelClassName}>Identificador (Carnet o Documento)</label>
             <div className="flex gap-3">
               <input 
                 type="text" 
                 value={carnetBuscar} 
                 onChange={(e) => setCarnetBuscar(e.target.value.toUpperCase())}
-                placeholder="Ej. SA26000008" 
+                placeholder="Ej. VM260016 o 01234567-8" 
                 className={inputClassName}
                 disabled={isSearching || isProcessing}
                 autoFocus
@@ -333,27 +380,36 @@ function VentanillaPagos() {
               {estadoCuenta.cargosPendientes.length > 0 && (
                 <div className="space-y-3 mb-6">
                   {estadoCuenta.cargosPendientes.map((cargo, index) => {
-                    const isSelected = selectedCargos.includes(cargo.idCargo);
+                    const isObligatorio = cargosObligatorios.includes(cargo.idCargo);
+                    const isSelected = selectedCargos.includes(cargo.idCargo) || isObligatorio;
+                    
                     return (
                       <label 
                         key={cargo.idCargo} 
-                        className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
+                        className={`flex items-center p-4 border rounded-xl transition-all duration-200 ${
                           isSelected ? 'border-black bg-gray-50/50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        } ${isObligatorio ? 'cursor-not-allowed opacity-95' : 'cursor-pointer'}`}
                       >
                         <div className="mr-4">
                           <input 
                             type="checkbox" 
                             checked={isSelected}
-                            onChange={(e) => toggleCargoSelection(index, e.target.checked)}
-                            disabled={isProcessing}
-                            className="w-5 h-5 text-black border-gray-300 rounded focus:ring-black cursor-pointer"
+                            onChange={(e) => {
+                              if (!isObligatorio) toggleCargoSelection(index, e.target.checked);
+                            }}
+                            disabled={isProcessing || isObligatorio} 
+                            className={`w-5 h-5 text-black border-gray-300 rounded focus:ring-black ${isObligatorio ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
                           />
                         </div>
                         <div className="flex-1">
                           <div className="flex justify-between items-start">
                             <div>
-                              <h4 className="font-bold text-gray-900">{formatearNombreCuota(cargo)}</h4>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-gray-900">{formatearNombreCuota(cargo)}</h4>
+                                {isObligatorio && (
+                                  <span className="text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold uppercase">Requerido</span>
+                                )}
+                              </div>
                               <p className="text-xs text-gray-500 mt-0.5">Vence: {cargo.fechaVencimiento || 'N/A'}</p>
                             </div>
                             <div className="text-right">
@@ -508,7 +564,7 @@ function VentanillaPagos() {
             ) : (
               <div className="text-center py-16 opacity-50 flex flex-col items-center">
                 <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Ingrese un carnet<br/>para iniciar</p>
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Ingrese un documento<br/>para iniciar</p>
               </div>
             )}
             
