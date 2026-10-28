@@ -24,6 +24,8 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 
+import AdmisionOnline from './pages/academico/AdmisionOnline';
+
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
 const normalizarRol = (rol = '') => {
   return String(rol || '')
@@ -137,6 +139,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
+
+        <Route path="/admision-online" element={<AdmisionOnline />} />
 
         <Route path="/forzar-password" element={
           <RutaCambioPassword>
