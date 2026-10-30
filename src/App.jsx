@@ -185,7 +185,7 @@ function App() {
           } />
 
           <Route path="nuevo-ingreso" element={
-          <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'REGISTRO_ACADEMICO']}>
+          <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO']}>
             <RegistroNuevoIngreso />
           </RutaPorRol>
           } />

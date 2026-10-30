@@ -287,7 +287,7 @@ const ConsultaNotas = () => {
                     <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-gray-900">{ciclo.codigoCiclo}</h3>
-                        <p className="text-[10px] text-gray-500">Año {ciclo.anio} • Ciclo {ciclo.numeroCiclo}</p>
+                         <p className="text-[10px] text-gray-500">Año {ciclo.anio} - Ciclo {ciclo.numeroCiclo}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         ciclo.estadoCiclo === 'ACTIVO' 

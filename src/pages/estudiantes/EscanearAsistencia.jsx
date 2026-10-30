@@ -9,19 +9,17 @@ const EscanearAsistencia = () => {
   const [enviando, setEnviando] = useState(false);
   
   const html5QrCodeRef = useRef(null);
-  const scannerContainerRef = useRef(null);
 
   useEffect(() => {
-    // Inicializar el escáner cuando el componente se monta
-    if (scannerContainerRef.current) {
-      html5QrCodeRef.current = new Html5Qrcode("reader");
-    }
+    // Inicializar el escáner al montar el componente (el div siempre existe en el DOM)
+    html5QrCodeRef.current = new Html5Qrcode("reader");
     
     return () => {
-      // Limpiar el escáner al desmontar
-      if (html5QrCodeRef.current) {
+      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
         html5QrCodeRef.current.stop().catch(() => {});
-        html5QrCodeRef.current.clear().catch(() => {});
+      }
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.clear();
       }
     };
   }, []);
@@ -30,27 +28,24 @@ const EscanearAsistencia = () => {
     setIsScanning(true);
     setScanResult(null);
     
-    // Esperar un pequeño momento para que el DOM se actualice
-    setTimeout(async () => {
-      try {
-        await html5QrCodeRef.current.start(
-          { facingMode: "environment" },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0
-          },
-          onScanSuccess,
-          onScanFailure
-        );
-      } catch (err) {
-        console.error("Error al iniciar la cámara:", err);
-        toast.error("No se pudo acceder a la cámara", { 
-          description: "Asegúrate de dar permisos de cámara o usa la opción manual." 
-        });
-        setIsScanning(false);
-      }
-    }, 100);
+    try {
+      await html5QrCodeRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        onScanSuccess,
+        onScanFailure
+      );
+    } catch (err) {
+      console.error("Error al iniciar la cámara:", err);
+      toast.error("No se pudo acceder a la cámara", { 
+        description: "Asegúrate de dar permisos de cámara o usa la opción manual." 
+      });
+      setIsScanning(false);
+    }
   };
 
   const stopScanning = async () => {
@@ -120,7 +115,6 @@ const EscanearAsistencia = () => {
           <p className="text-gray-500 text-sm">Escanea el código QR que muestra tu docente o ingresa el código manualmente.</p>
         </div>
 
-        {/* Área del Escáner - SIEMPRE visible pero oculta cuando no se usa */}
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mb-6">
           {!isScanning && !scanResult && (
             <div className="p-8 text-center">
@@ -143,25 +137,23 @@ const EscanearAsistencia = () => {
             </div>
           )}
 
-          {isScanning && (
-            <div className="relative">
-              {/* El div con id="reader" SIEMPRE debe existir cuando isScanning es true */}
-              <div id="reader" ref={scannerContainerRef} className="w-full"></div>
-              <button
-                onClick={stopScanning}
-                className="absolute top-4 right-4 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
-                  Apunta al código QR del docente
-                </span>
-              </div>
+          {/* El div reader siempre está en el DOM, solo se oculta con CSS cuando no se escanea */}
+          <div className={`relative ${isScanning ? 'block' : 'hidden'}`}>
+            <div id="reader" className="w-full"></div>
+            <button
+              onClick={stopScanning}
+              className="absolute top-4 right-4 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+              <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
+                Apunta al código QR del docente
+              </span>
             </div>
-          )}
+          </div>
 
           {scanResult && (
             <div className={`p-8 text-center ${scanResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
@@ -196,7 +188,6 @@ const EscanearAsistencia = () => {
           )}
         </div>
 
-        {/* Fallback: Ingreso Manual */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
