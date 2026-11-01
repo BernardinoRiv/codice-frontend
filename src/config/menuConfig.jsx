@@ -12,7 +12,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Registro Empleado', 
+    name: 'Registro de empleado', 
     path: '/dashboard/registro-empleados', 
     rolesPermitidos: ['ADMINISTRADOR'], 
     icon: (
@@ -22,7 +22,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Registro Docente', 
+    name: 'Registro de docente', 
     path: '/dashboard/registro-docente',
     rolesPermitidos: ['ADMINISTRADOR'], 
     icon: (
@@ -33,7 +33,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Directorio Docentes', 
+    name: 'Directorio de docentes', 
     path: '/dashboard/directorio-docentes', 
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
     icon: (
@@ -43,9 +43,9 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Oferta Académica', 
+    name: 'Oferta académica', 
     path: '/dashboard/oferta-academica', 
-    rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO'], 
+    rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO', 'ADMINISTRADOR'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
@@ -53,7 +53,7 @@ export const menuMaestro = [
     )
   },
   {
-    name: 'Ciclos en Planificación',
+    name: 'Ciclos en planificación',
     path: '/dashboard/ciclos-planificacion',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
@@ -63,7 +63,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Gestión de Secciones', 
+    name: 'Gestión de secciones', 
     path: '/dashboard/gestion-secciones', 
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'], 
     icon: (
@@ -73,7 +73,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Mis Clases', 
+    name: 'Mis clases', 
     path: '/dashboard/clases', 
     rolesPermitidos: ['DOCENTE', 'ESTUDIANTE', 'ADMINISTRADOR'], 
     icon: (
@@ -93,7 +93,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Ingreso de Notas', 
+    name: 'Ingreso de notas', 
     path: '/dashboard/notas', 
     rolesPermitidos: ['DOCENTE'], 
     icon: (
@@ -103,7 +103,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Registrar Asistencia', 
+    name: 'Registrar asistencia', 
     path: '/dashboard/escanear-asistencia', 
     rolesPermitidos: ['ESTUDIANTE'], 
     icon: (
@@ -114,7 +114,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Mis Calificaciones', 
+    name: 'Mis calificaciones', 
     path: '/dashboard/mis-notas', 
     rolesPermitidos: ['ESTUDIANTE'], 
     icon: (
@@ -124,7 +124,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Pagos y Aranceles', 
+    name: 'Pagos y aranceles', 
     path: '/dashboard/pagos', 
     rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'], 
     icon: (
@@ -134,7 +134,7 @@ export const menuMaestro = [
     )
   },
   {
-    name: 'Mi Estado de Cuenta',
+    name: 'Mi estado de cuenta',
     path: '/dashboard/mi-estado-cuenta',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
@@ -144,15 +144,15 @@ export const menuMaestro = [
     )
   },
   {
-  name: 'Nuevo Ingreso',
-  path: '/dashboard/nuevo-ingreso',
-  rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
-  icon: (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
-    </svg>
-  )
-},
+    name: 'Ingreso de aspirantes',
+    path: '/dashboard/nuevo-ingreso',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+      </svg>
+    )
+  },
   {
     name: 'Aranceles',
     path: '/dashboard/aranceles',
@@ -162,5 +162,5 @@ export const menuMaestro = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
-  },
+  }
 ];

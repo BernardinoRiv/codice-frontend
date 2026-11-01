@@ -1,13 +1,17 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'sonner';
+
+// Vistas de Autenticación (Públicas)
 import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
 import RecuperarPassword from './pages/auth/RecuperarPassword';
+
+// Layout Principal
 import DashboardLayout from './components/DashboardLayout';
 
+// Vistas Privadas (Dashboard)
 import Inicio from './pages/inicio/Inicio'; 
-
 import IngresoNotas from './pages/docentes/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
 import ListaDocentes from './pages/docentes/ListaDocentes';
@@ -24,6 +28,7 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 
+// Nueva vista pública de admisión
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
@@ -137,17 +142,21 @@ function App() {
       />
 
       <Routes>
+        {/* RUTAS PÚBLICAS */}
         <Route path="/" element={<Login />} />
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
-
+        
+        {/* Vista Pública de Admisión (No requiere login) */}
         <Route path="/admision-online" element={<AdmisionOnline />} />
 
+        {/* CAMBIO DE CONTRASEÑA OBLIGATORIO */}
         <Route path="/forzar-password" element={
           <RutaCambioPassword>
             <ForzarPassword />
           </RutaCambioPassword>
         } />
 
+        {/* RUTAS DEL DASHBOARD (Requieren Login) */}
         <Route path="/dashboard" element={
           <RutaProtegida>
             <DashboardLayout />
