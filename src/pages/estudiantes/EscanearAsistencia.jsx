@@ -11,7 +11,6 @@ const EscanearAsistencia = () => {
   const html5QrCodeRef = useRef(null);
 
   useEffect(() => {
-    // Inicializar el escáner al montar el componente (el div siempre existe en el DOM)
     html5QrCodeRef.current = new Html5Qrcode("reader");
     
     return () => {
@@ -40,9 +39,8 @@ const EscanearAsistencia = () => {
         onScanFailure
       );
     } catch (err) {
-      console.error("Error al iniciar la cámara:", err);
       toast.error("No se pudo acceder a la cámara", { 
-        description: "Asegúrate de dar permisos de cámara o usa la opción manual." 
+        description: "Verifica los permisos o usa el ingreso manual." 
       });
       setIsScanning(false);
     }
@@ -60,9 +58,7 @@ const EscanearAsistencia = () => {
     await registrarAsistencia(decodedText);
   };
 
-  const onScanFailure = (error) => {
-    // No hacer nada, esto se dispara constantemente mientras busca
-  };
+  const onScanFailure = () => {};
 
   const registrarAsistencia = async (token) => {
     setEnviando(true);
@@ -81,12 +77,13 @@ const EscanearAsistencia = () => {
       if (response.ok && data.exito) {
         setScanResult({ success: true, message: data.mensaje });
         toast.success("¡Asistencia registrada!", { description: data.mensaje });
+        setTokenManual('');
       } else {
         setScanResult({ success: false, message: data.mensaje || "Error al registrar" });
-        toast.error("Error", { description: data.mensaje });
+        toast.error("Registro fallido", { description: data.mensaje });
         setTimeout(() => {
           setScanResult(null);
-          startScanning();
+          if (!tokenManual) startScanning(); 
         }, 3000);
       }
     } catch (error) {
@@ -103,118 +100,118 @@ const EscanearAsistencia = () => {
       toast.error("Ingresa un código válido");
       return;
     }
+    setScanResult(null);
     registrarAsistencia(tokenManual.trim().toUpperCase());
   };
 
   return (
-    <div className="w-full pb-20 font-sans text-gray-900">
-      <div className="max-w-md mx-auto">
+    <div className="w-full pb-20 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="max-w-4xl mx-auto">
         
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-inter font-extrabold tracking-tight mb-2">Registrar Asistencia</h1>
-          <p className="text-gray-500 text-sm">Escanea el código QR que muestra tu docente o ingresa el código manualmente.</p>
+        <div className="mb-10 text-center">
+          <h1 className="text-3xl font-inter font-extrabold tracking-tight mb-2 text-slate-900">
+            Registrar asistencia
+          </h1>
+          <p className="text-slate-500 text-sm font-medium">
+            Selecciona el método de registro para tu clase actual.
+          </p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mb-6">
-          {!isScanning && !scanResult && (
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-gray-400">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75M13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
-                </svg>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* TARJETA 1: CÁMARA QR */}
+          <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm p-8 flex flex-col justify-center min-h-[340px] relative overflow-hidden">
+            {!isScanning && !scanResult && (
+              <div className="text-center animate-in zoom-in-95 duration-300">
+                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-900">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75M13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-extrabold text-slate-900 mb-1">Escáner QR</h3>
+                <p className="text-sm text-slate-500 mb-8">Apunta al código mostrado por el docente.</p>
+                <button
+                  onClick={startScanning}
+                  disabled={enviando}
+                  className="w-full h-[54px] bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  Abrir cámara
+                </button>
+              </div>
+            )}
+
+            <div className={`relative w-full ${isScanning ? 'block animate-in zoom-in-95 duration-300' : 'hidden'}`}>
+              <div className="rounded-2xl overflow-hidden bg-black">
+                <div id="reader" className="w-full min-h-[220px]"></div>
               </div>
               <button
-                onClick={startScanning}
-                className="w-full bg-black text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                onClick={stopScanning}
+                className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white p-2 rounded-full transition-colors z-10"
+                title="Cancelar escaneo"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>
-                Abrir Cámara
               </button>
             </div>
-          )}
 
-          {/* El div reader siempre está en el DOM, solo se oculta con CSS cuando no se escanea */}
-          <div className={`relative ${isScanning ? 'block' : 'hidden'}`}>
-            <div id="reader" className="w-full"></div>
-            <button
-              onClick={stopScanning}
-              className="absolute top-4 right-4 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-              <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
-                Apunta al código QR del docente
-              </span>
-            </div>
-          </div>
-
-          {scanResult && (
-            <div className={`p-8 text-center ${scanResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${scanResult.success ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                {scanResult.success ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
+            {scanResult && !tokenManual && (
+              <div className="text-center animate-in fade-in zoom-in-95 duration-300">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${scanResult.success ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  {scanResult.success ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                  )}
+                </div>
+                <h3 className={`text-lg font-extrabold mb-2 ${scanResult.success ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {scanResult.success ? 'Asistencia exitosa' : 'Registro fallido'}
+                </h3>
+                <p className="text-sm font-medium text-slate-500 mb-6 px-2">{scanResult.message}</p>
+                
+                {!scanResult.success && (
+                  <button onClick={() => { setScanResult(null); startScanning(); }} className="w-full h-[54px] bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-colors shadow-sm">
+                    Reintentar escaneo
+                  </button>
                 )}
               </div>
-              <h3 className={`text-lg font-bold mb-2 ${scanResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                {scanResult.success ? '¡Registrado!' : 'No se pudo registrar'}
-              </h3>
-              <p className="text-sm text-gray-600 mb-6">{scanResult.message}</p>
-              
-              {!scanResult.success && (
-                <button
-                  onClick={() => {
-                    setScanResult(null);
-                    startScanning();
-                  }}
-                  className="w-full bg-black text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors"
-                >
-                  Intentar de nuevo
-                </button>
-              )}
+            )}
+          </div>
+
+          {/* TARJETA 2: MANUAL */}
+          <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm p-8 flex flex-col justify-center min-h-[340px]">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-900">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-extrabold text-slate-900 mb-1">Ingreso manual</h3>
+              <p className="text-sm text-slate-500">Digita el token alfanumérico proporcionado.</p>
             </div>
-          )}
-        </div>
+            
+            <form onSubmit={handleManualSubmit} className="space-y-5">
+              <input
+                type="text"
+                value={tokenManual}
+                onChange={(e) => setTokenManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                placeholder="A1B2C3D4"
+                maxLength={8}
+                className="w-full h-[54px] bg-slate-50 text-slate-900 rounded-2xl px-4 font-mono font-bold text-center text-xl tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all border border-transparent focus:border-slate-300 placeholder-slate-300"
+                disabled={enviando || isScanning}
+              />
+              <button
+                type="submit"
+                disabled={enviando || tokenManual.length < 8 || isScanning}
+                className="w-full h-[54px] bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              >
+                {enviando ? 'Verificando...' : 'Confirmar token'}
+              </button>
+            </form>
+          </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-            </svg>
-            ¿La cámara no funciona? Ingresa el código manualmente
-          </h3>
-          <form onSubmit={handleManualSubmit} className="space-y-4">
-            <input
-              type="text"
-              value={tokenManual}
-              onChange={(e) => setTokenManual(e.target.value.toUpperCase())}
-              placeholder="Ej: A1B2C3D4"
-              maxLength={8}
-              className="w-full bg-[#F4F4F5] text-gray-900 rounded-xl px-4 py-3 font-mono text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-black/10 transition-all border border-transparent focus:border-gray-300"
-              disabled={enviando}
-            />
-            <button
-              type="submit"
-              disabled={enviando || tokenManual.length < 8}
-              className="w-full bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {enviando ? 'Registrando...' : 'Registrar Asistencia'}
-            </button>
-          </form>
         </div>
-
       </div>
     </div>
   );

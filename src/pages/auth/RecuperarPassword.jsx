@@ -79,7 +79,7 @@ function RecuperarPassword() {
       }
 
       toast.success('Código enviado', {
-        description: 'Revisa tu bandeja de entrada o la carpeta de Spam.'
+        description: 'Revisa tu bandeja de entrada o la carpeta de spam.'
       });
       
       setStep(2);
@@ -141,6 +141,7 @@ function RecuperarPassword() {
     }
   };
 
+  // Clases compartidas idénticas a Login.jsx
   const inputClass = "w-full bg-[#F3F4F6] text-gray-800 placeholder-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10 transition";
 
   return (
@@ -151,8 +152,9 @@ function RecuperarPassword() {
         </h1>
       </div>
 
-      <div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-4xl min-h-[520px] z-20">
+      <div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-3xl min-h-[480px] z-20">
         
+        {/* LADO IZQUIERDO (IMAGEN) */}
         <div className="hidden md:flex md:w-5/12 relative">
           <img 
             src={imagenFondo}
@@ -163,19 +165,21 @@ function RecuperarPassword() {
           <div className="relative z-10 p-10 w-full h-full flex flex-col justify-end">
             <div className="text-white">
               <h3 className="text-2xl font-semibold tracking-wide mb-2 drop-shadow-md">
-                Recuperación Segura
+                Recuperación segura
               </h3>
               <p className="text-sm text-gray-200/90 leading-relaxed font-light drop-shadow-sm">
-                Sigue los pasos para restablecer el acceso a tu cuenta institucional.
+                Sigue los pasos para restablecer el acceso a tu cuenta.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="w-full md:w-7/12 p-8 sm:p-10 md:p-12 flex flex-col justify-center relative z-20 bg-white overflow-hidden">
+        {/* LADO DERECHO (FORMULARIO) */}
+        <div className="w-full md:w-7/12 p-8 sm:p-10 md:p-16 flex flex-col justify-center relative z-20 bg-white overflow-hidden">
           
           <AnimatePresence mode="wait">
             
+            {/* PASO 1: SOLICITAR CÓDIGO */}
             {step === 1 && (
               <motion.div
                 key="step1"
@@ -189,13 +193,13 @@ function RecuperarPassword() {
                   Ingresa tu correo institucional y te enviaremos un código de seguridad de 6 dígitos.
                 </p>
 
-                <form onSubmit={handleSolicitarCodigo} className="space-y-5">
+                <form onSubmit={handleSolicitarCodigo} className="space-y-4">
                   <div>
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="correo@uma.edu.sv"
+                      onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
+                      placeholder="Correo institucional"
                       required
                       className={inputClass}
                     />
@@ -206,9 +210,9 @@ function RecuperarPassword() {
                     disabled={isLoading || !email}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.95 }}
-                    className="w-full bg-black text-white py-3.5 rounded-lg font-medium hover:bg-gray-800 transition duration-200 mt-2 cursor-pointer flex justify-center items-center disabled:opacity-90 disabled:cursor-not-allowed"
+                    className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition duration-200 mt-2 cursor-pointer flex justify-center items-center disabled:opacity-90 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? 'Enviando código...' : 'Enviar código de recuperación'}
+                    {isLoading ? 'Enviando...' : 'Enviar código'}
                   </motion.button>
                 </form>
 
@@ -220,6 +224,7 @@ function RecuperarPassword() {
               </motion.div>
             )}
 
+            {/* PASO 2: CREAR NUEVA CLAVE */}
             {step === 2 && (
               <motion.div
                 key="step2"
@@ -230,17 +235,17 @@ function RecuperarPassword() {
               >
                 <h2 className="text-3xl font-inder font-normal text-black mb-2">Crear nueva clave</h2>
                 <p className="text-gray-400 text-sm mb-6">
-                  Ingresa el código enviado a <b className="text-gray-700">{email}</b> y tu nueva contraseña.
+                  Ingresa el código enviado a tu correo.
                 </p>
 
-                <form onSubmit={handleRestablecerClave} className="space-y-4">
+                <form onSubmit={handleRestablecerClave} className="space-y-3">
                   <div>
                     <input
                       type="text"
                       maxLength="6"
                       value={codigo}
                       onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Código de 6 dígitos"
+                      placeholder="Código (6 dígitos)"
                       required
                       className={`${inputClass} ${codigo.length > 0 ? 'text-center tracking-[0.5em] font-bold text-lg' : ''}`}
                     />
@@ -273,24 +278,25 @@ function RecuperarPassword() {
                       type={showPassword ? "text" : "password"}
                       value={confirmarContrasena}
                       onChange={(e) => setConfirmarContrasena(e.target.value)}
-                      placeholder="Confirmar nueva contraseña"
+                      placeholder="Confirmar contraseña"
                       required
                       className={inputClass}
                     />
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  {/* Verificador de Seguridad Compacto */}
+                  <div className="bg-[#F9FAFB] p-3 rounded-lg border border-gray-100">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Seguridad</p>
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Seguridad</p>
                       <button 
                         type="button" 
                         onClick={generarContrasena}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        Sugerir contraseña fuerte
+                        Sugerir contraseña
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-2 gap-1 text-[11px]">
                       <div className={`flex items-center ${validations.length ? 'text-green-600' : 'text-gray-400'}`}>
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                         8+ caracteres
@@ -307,7 +313,7 @@ function RecuperarPassword() {
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                         Número
                       </div>
-                      <div className={`flex items-center ${validations.special ? 'text-green-600' : 'text-gray-400'}`}>
+                      <div className={`col-span-2 flex items-center ${validations.special ? 'text-green-600' : 'text-gray-400'}`}>
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                         Especial (@$!%*?)
                       </div>
@@ -319,13 +325,13 @@ function RecuperarPassword() {
                     disabled={isLoading || !codigo || !allValid}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.95 }}
-                    className="w-full bg-black text-white py-3.5 rounded-lg font-medium hover:bg-gray-800 transition duration-200 mt-4 flex justify-center items-center disabled:opacity-90 disabled:cursor-not-allowed"
+                    className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition duration-200 mt-2 flex justify-center items-center disabled:opacity-90 disabled:cursor-not-allowed"
                   >
                     {isLoading ? 'Actualizando...' : 'Restablecer contraseña'}
                   </motion.button>
                 </form>
                 
-                <div className="text-center mt-5">
+                <div className="text-center mt-4">
                   <button onClick={() => setStep(1)} className="text-sm text-gray-500 hover:text-black transition">
                     ← Usar otro correo
                   </button>
@@ -334,13 +340,9 @@ function RecuperarPassword() {
             )}
 
           </AnimatePresence>
-
         </div>
       </div>
 
-      <div className="absolute bottom-6 text-gray-400 text-sm text-center w-full px-4">
-        © 2026 Codice — Portal Académico Institucional
-      </div>
     </div>
   );
 }

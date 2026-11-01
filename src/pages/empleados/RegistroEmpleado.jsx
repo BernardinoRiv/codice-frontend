@@ -59,7 +59,7 @@ const esDuiValido = (dui) => {
 
 const esPasaporteValido = (pasaporte) => {
   const limpio = extraerAlfanumerico(pasaporte);
-  if (limpio.length < 6 || limpio.length > 12) return false;
+  if (limpio.length < 5 || limpio.length > 15) return false;
   const digitos = extraerDigitos(limpio);
   if (digitos.length === 0) return false;
   if (Number(digitos) === 0) return false;
@@ -133,9 +133,9 @@ function SelectBuscador({
   return (
     <div ref={containerRef} className={`relative ${open ? 'z-40' : 'z-10'}`}>
       <div className="h-5 mb-1.5 ml-1 flex items-center">
-        <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">
           {label}
-          {loading && <span className="animate-pulse text-blue-500 normal-case ml-1">(...)</span>}
+          {loading && <span className="animate-pulse text-blue-600 normal-case ml-1">(...)</span>}
         </label>
       </div>
 
@@ -148,13 +148,13 @@ function SelectBuscador({
             if (!open) setSearch('');
           }
         }}
-        className="w-full h-[50px] bg-white text-gray-900 border border-gray-200/80 rounded-[14px] px-4 text-[14px] focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm disabled:bg-gray-50/80 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
+        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
       >
-        <span className={`truncate ${seleccionado ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+        <span className={`truncate ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
           {seleccionado ? seleccionado.nombre : placeholder}
         </span>
         <svg
-          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -164,11 +164,11 @@ function SelectBuscador({
       </button>
 
       {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="p-2.5 border-b border-gray-100 bg-gray-50/50">
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="p-2.5 border-b border-slate-100 bg-slate-50">
             <div className="relative flex items-center">
               <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none"
+                className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -182,14 +182,14 @@ function SelectBuscador({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
                 autoFocus
-                className="w-full bg-white text-gray-900 border border-gray-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-gray-400"
+                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
               />
               {(search || seleccionado) && (
                 <button
                   type="button"
                   onClick={handleLimpiar}
                   title={search ? "Limpiar búsqueda" : "Limpiar selección"}
-                  className="absolute right-2.5 p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="absolute right-2.5 p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -199,9 +199,9 @@ function SelectBuscador({
             </div>
           </div>
 
-          <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-56 overflow-y-auto divide-y divide-slate-50">
             {filtrados.length === 0 ? (
-              <div className="px-4 py-4 text-xs text-gray-400 text-center">
+              <div className="px-4 py-4 text-xs text-slate-600 text-center font-medium">
                 No se encontraron resultados
               </div>
             ) : (
@@ -217,7 +217,7 @@ function SelectBuscador({
                       setSearch('');
                     }}
                     className={`w-full text-left px-4 py-3 text-[13px] transition-colors flex items-center justify-between gap-3 ${
-                      activo ? 'bg-gray-900 text-white font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      activo ? 'bg-slate-900 text-white font-semibold' : 'text-slate-700 font-medium hover:bg-slate-50'
                     }`}
                   >
                     <span className="leading-snug break-words">{item.nombre}</span>
@@ -252,7 +252,8 @@ function RegistroEmpleado() {
     tiposDocumento: [],
     departamentos: [],
     areas: [],
-    cargos: []
+    cargos: [],
+    sedes: []
   });
 
   const [distritos, setDistritos] = useState([]);
@@ -272,6 +273,7 @@ function RegistroEmpleado() {
     idDistrito: '',
     direccion: '',
     idArea: '',
+    idSede: '',
     idCargo: ''
   });
 
@@ -287,7 +289,7 @@ function RegistroEmpleado() {
     const fetchCatalogos = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos-documento,departamentos,areas,cargos`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos-documento,departamentos,areas,cargos,sedes`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -298,7 +300,8 @@ function RegistroEmpleado() {
           tiposDocumento: data['tipos-documento'] || data['tipos_documento'] || [],
           departamentos: data['departamentos'] || [],
           areas: data['areas'] || [],
-          cargos: data['cargos'] || []
+          cargos: data['cargos'] || [],
+          sedes: data['sedes'] || []
         });
       } catch (error) {
         toast.error('Error al cargar catálogos', { description: 'Revisa tu conexión con el servidor.' });
@@ -341,6 +344,7 @@ function RegistroEmpleado() {
   };
 
   const handleReset = () => {
+    toast.dismiss();
     setDocumentoVerificado(false);
     setPersonaExistente(false);
     setRolesActuales([]);
@@ -359,11 +363,13 @@ function RegistroEmpleado() {
       idDistrito: '',
       direccion: '',
       idArea: '',
+      idSede: '',
       idCargo: ''
     }));
   };
 
   const handleTipoDocumentoChange = (val) => {
+    toast.dismiss();
     setDocumentoVerificado(false);
     setPersonaExistente(false);
     setRolesActuales([]);
@@ -371,13 +377,14 @@ function RegistroEmpleado() {
   };
 
   const handleNumeroDocumentoChange = (valorInput) => {
+    toast.dismiss();
     setDocumentoVerificado(false);
     setPersonaExistente(false);
     setRolesActuales([]);
 
     const nuevoValor = esTipoDui()
       ? formatearDui(valorInput)
-      : extraerAlfanumerico(valorInput).slice(0, 12);
+      : extraerAlfanumerico(valorInput).slice(0, 15); 
 
     setFormData(prev => ({ ...prev, numeroDocumento: nuevoValor }));
   };
@@ -387,8 +394,10 @@ function RegistroEmpleado() {
   };
 
   const verificarDocumento = async () => {
+    toast.dismiss();
+
     if (!formData.idTipoDocumento || !formData.numeroDocumento) {
-      toast.error('Datos Incompletos', { description: 'Selecciona el tipo e ingresa el número de documento.' });
+      toast.error('Datos incompletos', { description: 'Selecciona el tipo e ingresa el número de documento.' });
       return;
     }
 
@@ -397,18 +406,18 @@ function RegistroEmpleado() {
     if (esTipoDui()) {
       const digitosDui = extraerDigitos(docParaEnviar);
       if (digitosDui.length !== 9) {
-        toast.error('DUI Incompleto', { description: 'Ingresa los 9 dígitos del DUI (formato 00000000-0).' });
+        toast.error('DUI incompleto', { description: 'Ingresa los 9 dígitos del DUI (formato 00000000-0).' });
         return;
       }
       if (!esDuiValido(digitosDui)) {
-        toast.error('DUI No Válido', { description: 'El número de DUI ingresado no supera la validación matemática oficial (Módulo 10).' });
+        toast.error('DUI no válido', { description: 'El número de DUI ingresado no supera la validación matemática.' });
         return;
       }
       docParaEnviar = formatearDui(digitosDui);
     } else {
       const alfanum = extraerAlfanumerico(docParaEnviar);
       if (!esPasaporteValido(alfanum)) {
-        toast.error('Pasaporte / Documento Inválido', { description: 'Debe contener entre 6 y 12 caracteres alfanuméricos válidos.' });
+        toast.error('Documento inválido', { description: 'Debe contener entre 6 y 15 caracteres alfanuméricos válidos.' });
         return;
       }
       docParaEnviar = alfanum;
@@ -417,12 +426,13 @@ function RegistroEmpleado() {
     setIsVerifying(true);
     try {
       const token = localStorage.getItem('token');
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/personas/buscar-por-documento?numeroDocumento=${encodeURIComponent(docParaEnviar)}`, {
+      const endpoint = `${import.meta.env.VITE_API_URL}/api/v1/personas/buscar-por-documento?numeroDocumento=${encodeURIComponent(docParaEnviar)}`;
+      
+      const res = await fetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.status === 404 || response.status === 204) {
+      if (res.status === 404 || res.status === 204) {
         setPersonaExistente(false);
         setDocumentoVerificado(true);
         setRolesActuales([]);
@@ -440,24 +450,15 @@ function RegistroEmpleado() {
           idDistrito: '',
           direccion: '',
           idArea: '',
+          idSede: '',
           idCargo: ''
         }));
-        toast.success('Documento Verificado y Libre', { description: 'Puedes proceder a registrar al nuevo empleado.' });
+        toast.success('Documento verificado', { description: 'Puedes proceder a registrar al nuevo empleado.' });
         return;
       }
 
-      if (response.ok) {
-        const text = await response.text();
-        if (!text) {
-          setPersonaExistente(false);
-          setDocumentoVerificado(true);
-          setRolesActuales([]);
-          setFormData(prev => ({ ...prev, numeroDocumento: docParaEnviar }));
-          toast.success('Documento Verificado y Libre', { description: 'Puedes proceder a registrar al nuevo empleado.' });
-          return;
-        }
-
-        const data = JSON.parse(text);
+      if (res.ok) {
+        const data = await res.json();
         const roles = data.rolesActivos || data.roles || data.perfiles || [];
         const tieneEmpleado = roles.some(r => typeof r === 'string' && r.toUpperCase().includes('EMPLEADO'));
 
@@ -475,6 +476,7 @@ function RegistroEmpleado() {
           idDistrito: data.idDistrito ? String(data.idDistrito) : '',
           direccion: data.direccion || '',
           idArea: data.idArea ? String(data.idArea) : '',
+          idSede: data.idSede ? String(data.idSede) : '',
           idCargo: data.idCargo ? String(data.idCargo) : ''
         }));
 
@@ -483,16 +485,27 @@ function RegistroEmpleado() {
         setRolesActuales(roles);
 
         if (tieneEmpleado) {
-          toast.error('Empleado ya registrado', { description: 'El documento ingresado ya pertenece a un Empleado activo.' });
+          toast.error('Empleado ya registrado', { description: 'El documento ingresado ya pertenece a un empleado activo.' });
         } else {
-          toast.success('Persona Encontrada', { description: 'Se autocompletaron los datos personales. Completa la asignación de cargo.' });
+          toast.success('Persona encontrada', { description: 'Se autocompletaron los datos personales.' });
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        toast.error(errData.mensaje || 'Error al verificar el documento');
+        const errData = await res.json().catch(() => ({}));
+        let msjDetallado = errData.mensaje;
+        
+        if (!msjDetallado && errData.detalles) {
+          msjDetallado = Object.entries(errData.detalles).map(([k, v]) => `${v}`).join(' | ');
+        }
+        if (!msjDetallado && errData.errors && Array.isArray(errData.errors)) {
+          msjDetallado = errData.errors.map(e => e.defaultMessage).join(' | ');
+        }
+
+        toast.error('Rechazado por el servidor', { 
+          description: msjDetallado || `HTTP ${res.status}: El backend no admite este formato de documento.` 
+        });
       }
     } catch (error) {
-      toast.error('Error de Verificación', { description: 'Revisa tu conexión con el servidor.' });
+      toast.error('Error de conexión', { description: 'Revisa tu conexión con el servidor.' });
     } finally {
       setIsVerifying(false);
     }
@@ -503,7 +516,7 @@ function RegistroEmpleado() {
 
   const documentoFormatoCompleto = esTipoDui()
     ? digitosDocActual.length === 9
-    : alfanumDocActual.length >= 6;
+    : alfanumDocActual.length >= 5;
 
   const docValido = documentoFormatoCompleto && (
     esTipoDui() ? esDuiValido(digitosDocActual) : esPasaporteValido(alfanumDocActual)
@@ -528,17 +541,18 @@ function RegistroEmpleado() {
 
   const c3 = [
     String(formData.idArea || '').trim() !== '',
+    String(formData.idSede || '').trim() !== '',
     String(formData.idCargo || '').trim() !== ''
   ].filter(Boolean).length;
 
-  const isReady = (c1 === 6 && c2 === 5 && c3 === 2 && documentoVerificado && !esEmpleadoActivo);
+  const isReady = (c1 === 6 && c2 === 5 && c3 === 3 && documentoVerificado && !esEmpleadoActivo);
 
   const handlePreSubmit = (e) => {
     e.preventDefault();
     if (!documentoVerificado || esEmpleadoActivo) return;
 
     if (!esTelefonoValido(formData.telefono)) {
-      toast.warning('Teléfono inválido', { description: 'El número telefónico debe tener 8 dígitos e iniciar con 2, 6 o 7 (ej. 7000-0000).' });
+      toast.warning('Teléfono inválido', { description: 'El número debe tener 8 dígitos e iniciar con 2, 6 o 7.' });
       return;
     }
 
@@ -568,6 +582,7 @@ function RegistroEmpleado() {
         sexo: formData.sexo,
         idDistrito: parseInt(formData.idDistrito, 10),
         idArea: parseInt(formData.idArea, 10),
+        idSede: parseInt(formData.idSede, 10),
         idCargo: parseInt(formData.idCargo, 10),
         fechaFin: new Date().toISOString().split('T')[0],
         fechasValidas: true
@@ -605,7 +620,7 @@ function RegistroEmpleado() {
   };
 
   const getIniciales = () => formData.nombres ? formData.nombres.charAt(0).toUpperCase() : 'E';
-  const getNombreCompleto = () => (!formData.nombres && !formData.apellidos) ? 'Perfil de Empleado' : `${formData.nombres} ${formData.apellidos}`;
+  const getNombreCompleto = () => (!formData.nombres && !formData.apellidos) ? 'Perfil de empleado' : `${formData.nombres} ${formData.apellidos}`;
   const getPreviewEmail = () => {
     if (!formData.nombres || !formData.apellidos) return 'usuario@uma.edu.sv';
     return `${formData.nombres.trim().charAt(0).toLowerCase()}.${formData.apellidos.trim().split(' ')[0].toLowerCase()}@uma.edu.sv`;
@@ -622,6 +637,12 @@ function RegistroEmpleado() {
     if (!formData.idCargo) return '---';
     const cargoEncontrado = catalogos.cargos?.find(c => String(c.id) === String(formData.idCargo));
     return cargoEncontrado ? cargoEncontrado.nombre : '---';
+  };
+
+  const getSedeTexto = () => {
+    if (!formData.idSede) return '---';
+    const sedeEncontrada = catalogos.sedes?.find(s => String(s.id) === String(formData.idSede));
+    return sedeEncontrada ? sedeEncontrada.nombre : '---';
   };
 
   const getDistritoTexto = () => {
@@ -644,8 +665,8 @@ function RegistroEmpleado() {
 
   const getStatus3 = () => {
     if (esEmpleadoActivo) return { state: 'idle' }; 
-    if (c3 === 2 && documentoVerificado) return { state: 'complete' };
-    if (c3 > 0 && documentoVerificado) return { state: 'active', pct: Math.round((c3 / 2) * 100) };
+    if (c3 === 3 && documentoVerificado) return { state: 'complete' };
+    if (c3 > 0 && documentoVerificado) return { state: 'active', pct: Math.round((c3 / 3) * 100) };
     return { state: 'idle' };
   };
 
@@ -659,14 +680,14 @@ function RegistroEmpleado() {
       <div className="flex flex-col items-center relative z-10 w-10 group cursor-default">
         <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-sm ${
           state === 'complete' ? 'border-[#2E7D32] bg-[#2E7D32]' : 
-          state === 'active' ? 'border-[#2E7D32] text-[#2E7D32] bg-white' : 'border-gray-200 text-gray-300 bg-white'
+          state === 'active' ? 'border-[#2E7D32] text-[#2E7D32] bg-white' : 'border-slate-200 text-slate-500 bg-white'
         }`}>
           {state === 'complete' && <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-          {state === 'active' && <span className="font-bold text-[10px]">{pct}%</span>}
-          {state === 'idle' && <span className="font-bold text-sm">{stepNum}</span>}
+          {state === 'active' && <span className="font-extrabold text-[10px]">{pct}%</span>}
+          {state === 'idle' && <span className="font-extrabold text-sm">{stepNum}</span>}
         </div>
-        <span className={`absolute top-11 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap transition-colors duration-300 ${
-          state === 'complete' ? 'text-[#2E7D32]' : state === 'active' ? 'text-gray-900' : 'text-gray-400'
+        <span className={`absolute top-11 text-[9px] font-extrabold uppercase tracking-widest whitespace-nowrap transition-colors duration-300 ${
+          state === 'complete' ? 'text-[#2E7D32]' : state === 'active' ? 'text-slate-900' : 'text-slate-500'
         }`}>{label}</span>
       </div>
     );
@@ -674,15 +695,15 @@ function RegistroEmpleado() {
 
   const StepLine = ({ percentage }) => (
     <div className="flex-1 flex items-center px-1">
-      <div className="h-[3px] w-full bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-[3px] w-full bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full bg-[#2E7D32] transition-all duration-500 ease-out" style={{ width: `${percentage}%` }}></div>
       </div>
     </div>
   );
 
-  const inputClassName = "w-full h-[50px] bg-white text-gray-900 border border-gray-200/80 rounded-[14px] px-4 text-[14px] focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm placeholder-gray-400 disabled:bg-gray-50/50 disabled:text-gray-500 disabled:cursor-not-allowed";
-  const labelClassName = "block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1";
-  const sectionTitleClassName = "text-[12px] font-bold text-gray-400 uppercase tracking-widest mb-5 pb-2 border-b border-gray-100 flex items-center gap-2";
+  const inputClassName = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed";
+  const labelClassName = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
+  const sectionTitleClassName = "text-[12px] font-extrabold text-slate-800 uppercase tracking-widest mb-5 pb-2 border-b border-slate-200 flex items-center gap-2";
 
   const opcionesSexo = [
     { id: 'M', nombre: 'Masculino' },
@@ -693,33 +714,37 @@ function RegistroEmpleado() {
 
   return (
     <>
-      <div className="w-full max-w-7xl pb-20 font-sans text-gray-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="w-full max-w-7xl pb-20 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
 
           <div className="lg:col-span-7 xl:col-span-8">
             <div className="mb-10 flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-inter font-extrabold tracking-tight mb-1">Registro de Empleado</h1>
-                <p className="text-gray-500 text-sm">Completa el formulario para generar un nuevo perfil administrativo.</p>
+                <h1 className="text-3xl font-inter font-extrabold tracking-tight mb-1 text-slate-900">
+                  Registro de empleado
+                </h1>
+                <p className="text-slate-600 text-sm font-medium">
+                  Completa el formulario para generar un nuevo perfil administrativo.
+                </p>
               </div>
             </div>
 
             <form onSubmit={handlePreSubmit} className="space-y-10">
 
-              <div className="bg-gray-50/50 border border-gray-200/60 p-6 rounded-2xl relative">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-black rounded-l-2xl"></div>
+              <div className="bg-white border border-slate-200 p-6 rounded-2xl relative shadow-sm">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900 rounded-l-2xl"></div>
 
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-[13px] font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                    Paso 1: Verificación de Identidad
+                  <h3 className="text-[13px] font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    Paso 1: Verificación de identidad
                   </h3>
 
                   <button 
                     type="button" 
                     onClick={handleReset}
-                    className="text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-gray-900 flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm"
+                    className="text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     Restablecer
                   </button>
                 </div>
@@ -727,7 +752,7 @@ function RegistroEmpleado() {
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                   <div className="md:col-span-4">
                     <SelectBuscador
-                      label="Tipo Doc."
+                      label="Tipo doc."
                       value={formData.idTipoDocumento}
                       onChange={handleTipoDocumentoChange}
                       options={catalogos.tiposDocumento}
@@ -739,14 +764,14 @@ function RegistroEmpleado() {
 
                   <div className="md:col-span-5">
                     <div className="h-5 mb-1.5 ml-1 flex items-center justify-between">
-                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                        Número de Doc.
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">
+                        Número de doc.
                       </label>
                       {documentoFormatoCompleto && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full leading-none ${
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full leading-none ${
                           docValido
-                            ? 'bg-green-50 text-green-700'
-                            : 'bg-red-50 text-red-600'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-red-50 text-red-700'
                         }`}>
                           {docValido
                             ? (esTipoDui() ? '✓ DUI auténtico' : '✓ Formato válido')
@@ -766,7 +791,7 @@ function RegistroEmpleado() {
                       }}
                       required
                       disabled={!formData.idTipoDocumento || isVerifying}
-                      className={`${inputClassName} ${!formData.idTipoDocumento ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
+                      className={`${inputClassName} ${!formData.idTipoDocumento ? 'bg-slate-100/50 cursor-not-allowed' : ''}`}
                       placeholder={esTipoDui() ? '00000000-0' : 'Ej. A12345678'}
                     />
                   </div>
@@ -776,21 +801,21 @@ function RegistroEmpleado() {
                       type="button"
                       onClick={verificarDocumento}
                       disabled={isVerifying || !formData.numeroDocumento || documentoVerificado}
-                      className="w-full h-[50px] bg-black text-white px-4 rounded-[14px] text-[14px] font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full h-[50px] bg-slate-900 text-white px-4 rounded-xl text-sm font-semibold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
                     >
                       {isVerifying ? 'Buscando...' : documentoVerificado ? 'Verificado' : 'Verificar'}
-                      {!isVerifying && documentoVerificado && <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                      {!isVerifying && documentoVerificado && <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </button>
                   </div>
                 </div>
 
                 {documentoVerificado && esEmpleadoActivo && (
                   <div className="mt-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     <div>
-                      <h4 className="text-sm font-bold text-red-900 leading-none mb-1">Registro Bloqueado</h4>
-                      <p className="text-xs text-red-700 leading-relaxed">
-                        El perfil de <strong>{formData.nombres} {formData.apellidos}</strong> ya pertenece a un <strong>Empleado Activo</strong>. Desde esta pantalla solo se permiten nuevos registros.
+                      <h4 className="text-sm font-bold text-red-900 leading-none mb-1">Registro bloqueado</h4>
+                      <p className="text-xs text-red-800 font-medium leading-relaxed">
+                        El perfil de <strong>{formData.nombres} {formData.apellidos}</strong> ya pertenece a un <strong>empleado activo</strong>. Desde esta pantalla solo se permiten nuevos registros.
                       </p>
                     </div>
                   </div>
@@ -798,10 +823,10 @@ function RegistroEmpleado() {
 
                 {documentoVerificado && personaExistente && !esEmpleadoActivo && (
                   <div className="mt-5 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <div>
-                      <h4 className="text-sm font-bold text-blue-900 leading-none mb-1">Perfil Existente Encontrado</h4>
-                      <p className="text-xs text-blue-700 leading-relaxed">
+                      <h4 className="text-sm font-bold text-blue-900 leading-none mb-1">Perfil existente encontrado</h4>
+                      <p className="text-xs text-blue-800 font-medium leading-relaxed">
                         Esta persona ya está registrada en el sistema como <strong>{rolesActuales.join(', ') || 'Usuario'}</strong>. Sus datos personales han sido bloqueados. Completa los datos institucionales para asignarle un puesto administrativo.
                       </p>
                     </div>
@@ -810,18 +835,18 @@ function RegistroEmpleado() {
               </div>
 
               <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-black"></div> Datos Generales {personaExistente && <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-2.5 py-0.5 rounded-full font-bold">Autocompletado</span>}</h3>
+                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Datos generales {personaExistente && <span className="ml-2 text-[10px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">Autocompletado</span>}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                   <div>
                     <label className={labelClassName}>Nombres</label>
                     <input
                       type="text"
                       value={formData.nombres}
-                      onChange={(e) => setFormData(prev => ({ ...prev, nombres: e.target.value.replace(/[0-9<>]/g, '') }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nombres: e.target.value.toUpperCase().replace(/[0-9<>]/g, '') }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       className={inputClassName}
-                      placeholder="Ej. Juan Carlos"
+                      placeholder="Ej. JUAN CARLOS"
                     />
                   </div>
                   <div>
@@ -829,16 +854,16 @@ function RegistroEmpleado() {
                     <input
                       type="text"
                       value={formData.apellidos}
-                      onChange={(e) => setFormData(prev => ({ ...prev, apellidos: e.target.value.replace(/[0-9<>]/g, '') }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, apellidos: e.target.value.toUpperCase().replace(/[0-9<>]/g, '') }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       className={inputClassName}
-                      placeholder="Ej. Pérez García"
+                      placeholder="Ej. PEREZ GARCIA"
                     />
                   </div>
                   <div>
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
-                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest">Fecha Nacimiento</label>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label>
                     </div>
                     <input
                       type="date"
@@ -865,13 +890,13 @@ function RegistroEmpleado() {
               </div>
 
               <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div> Información de Contacto {personaExistente && <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-2.5 py-0.5 rounded-full font-bold">Bloqueado</span>}</h3>
+                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div> Información de contacto {personaExistente && <span className="ml-2 text-[10px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">Bloqueado</span>}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                   <div>
                     <div className="h-5 mb-1.5 ml-1 flex items-center justify-between">
-                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest">Teléfono</label>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Teléfono</label>
                       {digitosTelefonoActual.length > 0 && !['2', '6', '7'].includes(digitosTelefonoActual[0]) && (
-                        <span className="text-[10px] font-bold text-red-500">Debe iniciar con 2, 6 o 7</span>
+                        <span className="text-[10px] font-bold text-red-600">Debe iniciar con 2, 6 o 7</span>
                       )}
                     </div>
                     <input
@@ -886,7 +911,7 @@ function RegistroEmpleado() {
                   </div>
                   <div>
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
-                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest">Correo Personal</label>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label>
                     </div>
                     <input
                       type="email"
@@ -905,7 +930,7 @@ function RegistroEmpleado() {
                       value={formData.idDepartamento}
                       onChange={(val) => setFormData(prev => ({ ...prev, idDepartamento: val, idDistrito: '' }))}
                       options={catalogos.departamentos}
-                      placeholder="-- Seleccione Departamento --"
+                      placeholder="-- Seleccione departamento --"
                       searchPlaceholder="Buscar departamento..."
                       disabled={!documentoVerificado || isLoadingCatalogos || personaExistente}
                     />
@@ -918,21 +943,21 @@ function RegistroEmpleado() {
                       value={formData.idDistrito}
                       onChange={(val) => setFormData(prev => ({ ...prev, idDistrito: val }))}
                       options={distritos}
-                      placeholder={distritos.length === 0 ? '-- Elija Depto. --' : '-- Seleccione Distrito --'}
+                      placeholder={distritos.length === 0 ? '-- Elija depto. --' : '-- Seleccione distrito --'}
                       searchPlaceholder="Buscar distrito..."
                       disabled={!documentoVerificado || !formData.idDepartamento || distritos.length === 0 || personaExistente}
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className={labelClassName}>Dirección Detallada</label>
+                    <label className={labelClassName}>Dirección detallada</label>
                     <textarea
                       value={formData.direccion}
                       onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value.replace(/[<>]/g, '') }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       rows="2"
-                      className="w-full bg-white text-gray-900 border border-gray-200/80 rounded-[14px] px-4 py-3 text-[14px] focus:outline-none focus:ring-4 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm placeholder-gray-400 disabled:bg-gray-50/50 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
+                      className="w-full bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed resize-none"
                       placeholder="Colonia, pasaje, casa..."
                     />
                   </div>
@@ -940,27 +965,40 @@ function RegistroEmpleado() {
               </div>
 
               <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div> Datos Institucionales {esEmpleadoActivo && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Solo Lectura</span>}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                  <div>
+                <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Datos institucionales {esEmpleadoActivo && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Solo Lectura</span>}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+                  <div className="md:col-span-1">
                     <SelectBuscador
-                      label="Área Asignada"
+                      label="Sede Operativa"
+                      value={formData.idSede}
+                      onChange={(val) => setFormData(prev => ({ ...prev, idSede: val }))}
+                      options={catalogos.sedes}
+                      placeholder="-- Seleccione sede --"
+                      searchPlaceholder="Buscar sede..."
+                      disabled={!documentoVerificado || isLoadingCatalogos || esEmpleadoActivo}
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <SelectBuscador
+                      label="Área asignada"
                       value={formData.idArea}
                       onChange={(val) => setFormData(prev => ({ ...prev, idArea: val }))}
                       options={catalogos.areas}
-                      placeholder="-- Seleccione Área --"
+                      placeholder="-- Seleccione área --"
                       searchPlaceholder="Buscar área..."
                       disabled={!documentoVerificado || isLoadingCatalogos || esEmpleadoActivo}
                     />
                   </div>
                   
-                  <div>
+                  <div className="md:col-span-1">
                     <SelectBuscador
-                      label="Puesto / Cargo"
+                      label="Puesto / cargo"
                       value={formData.idCargo}
                       onChange={(val) => setFormData(prev => ({ ...prev, idCargo: val }))}
                       options={catalogos.cargos}
-                      placeholder="-- Seleccione Cargo --"
+                      placeholder="-- Seleccione cargo --"
                       searchPlaceholder="Buscar puesto o cargo..."
                       disabled={!documentoVerificado || isLoadingCatalogos || esEmpleadoActivo}
                     />
@@ -969,22 +1007,22 @@ function RegistroEmpleado() {
               </div>
 
               <div className="pt-2 flex justify-end">
-                <button type="submit" disabled={isLoading || !isReady || esEmpleadoActivo} className={`px-8 py-3.5 rounded-[14px] text-[15px] font-semibold transition-all duration-300 flex items-center space-x-2 ${
-                  esEmpleadoActivo ? 'bg-red-50 text-red-400 border border-red-200 cursor-not-allowed' : 'bg-black text-white hover:shadow-lg hover:shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed'
+                <button type="submit" disabled={isLoading || !isReady || esEmpleadoActivo} className={`px-8 py-3.5 rounded-xl text-[15px] font-bold transition-all duration-300 flex items-center space-x-2 ${
+                  esEmpleadoActivo ? 'bg-red-50 text-red-600 border border-red-200 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm'
                 }`}>
-                  <span>{esEmpleadoActivo ? 'Registro Bloqueado' : 'Confirmar e Inscribir'}</span>
+                  <span>{esEmpleadoActivo ? 'Registro bloqueado' : 'Confirmar e inscribir'}</span>
                 </button>
               </div>
             </form>
           </div>
 
           <div className="lg:col-span-5 xl:col-span-4 hidden lg:block relative">
-            <div className="bg-white rounded-2xl p-7 border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sticky top-8 transition-all duration-300">
+            <div className="bg-white rounded-2xl p-7 border border-slate-200 shadow-sm sticky top-8 transition-all duration-300">
               <div className="mb-10 flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-gray-900">{getPreviewCodigo()}</h2>
-                  <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-bold">
-                    {esEmpleadoActivo ? 'Perfil Bloqueado' : personaExistente ? 'Nuevo Contrato Empleado' : 'Nuevo Registro'}
+                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">{getPreviewCodigo()}</h2>
+                  <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-bold">
+                    {esEmpleadoActivo ? 'Perfil bloqueado' : personaExistente ? 'Nuevo contrato empleado' : 'Nuevo registro'}
                   </p>
                 </div>
               </div>
@@ -1000,33 +1038,33 @@ function RegistroEmpleado() {
               </div>
 
               <div className="flex flex-col items-center mb-6">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mb-3 shadow-sm transition-colors relative border ${
-                  esEmpleadoActivo ? 'bg-red-50 text-red-500 border-red-100' : 'bg-gray-50 text-gray-400 border-gray-100'
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-extrabold mb-3 shadow-sm transition-colors relative border ${
+                  esEmpleadoActivo ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-500 border-slate-200'
                 }`}>
                   {getIniciales()}
                   {esEmpleadoActivo && (
                     <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-600 border-2 border-white"></span>
                     </span>
                   )}
                   {personaExistente && !esEmpleadoActivo && (
                     <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 border-2 border-white"></span>
+                      <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-600 border-2 border-white"></span>
                     </span>
                   )}
                 </div>
-                <h4 className={`text-base font-bold text-center leading-tight ${!formData.nombres && !formData.apellidos ? 'text-gray-400' : 'text-gray-900'}`}>
+                <h4 className={`text-base font-extrabold text-center leading-tight ${!formData.nombres && !formData.apellidos ? 'text-slate-400' : 'text-slate-900'}`}>
                   {getNombreCompleto()}
                 </h4>
                 
                 {rolesActuales.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 justify-center">
                     {rolesActuales.map((rol, idx) => {
                       const isEmpleado = typeof rol === 'string' && rol.toUpperCase().includes('EMPLEADO');
                       return (
-                        <span key={idx} className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${isEmpleado ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                        <span key={idx} className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${isEmpleado ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
                           {rol}
                         </span>
                       );
@@ -1035,15 +1073,16 @@ function RegistroEmpleado() {
                 )}
               </div>
 
-              <div className="border-t border-gray-50 pt-5 space-y-4">
-                <div className="flex justify-between items-center text-sm"><span className="text-gray-400">Correo</span><span className="font-medium text-gray-900">{getPreviewEmail()}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-gray-400">Documento</span><span className="font-medium text-gray-900 text-right">{formData.numeroDocumento || '----------'}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-gray-400">Área</span><span className="font-medium text-gray-900 text-right w-1/2 truncate">{getAreaTexto()}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-gray-400">Cargo</span><span className="font-medium text-gray-900 text-right w-1/2 truncate">{getCargoTexto()}</span></div>
+              <div className="border-t border-slate-100 pt-5 space-y-4">
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Correo</span><span className="font-bold text-slate-800">{getPreviewEmail()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Documento</span><span className="font-bold text-slate-800 text-right">{formData.numeroDocumento || '----------'}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Sede operativa</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getSedeTexto()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Área</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getAreaTexto()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Cargo</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getCargoTexto()}</span></div>
               </div>
 
-              <div className="mt-8 pt-5 border-t border-dashed border-gray-100">
-                <p className={`text-[10px] text-center leading-relaxed font-medium ${esEmpleadoActivo ? 'text-red-400' : 'text-gray-400'}`}>
+              <div className="mt-8 pt-5 border-t border-dashed border-slate-200">
+                <p className={`text-[10px] text-center leading-relaxed font-bold ${esEmpleadoActivo ? 'text-red-500' : 'text-slate-500'}`}>
                   {esEmpleadoActivo 
                     ? 'Esta vista es de solo lectura porque el empleado ya existe en el sistema.' 
                     : personaExistente 
@@ -1060,57 +1099,57 @@ function RegistroEmpleado() {
       {modalConfirmar && createPortal(
         <div className="fixed inset-0 z-[9999] overflow-y-auto font-sans">
           <div
-            className="fixed inset-0 bg-black/40 transition-opacity"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity"
             onClick={() => !isLoading && setModalConfirmar(false)}
           ></div>
 
           <div className="flex min-h-screen items-center justify-center p-4 text-center">
-            <div className="relative bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl border border-gray-100 text-left my-8 animate-in zoom-in-95 duration-200">
-              <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="relative bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl border border-slate-200 text-left my-8 animate-in zoom-in-95 duration-200">
+              <div className="flex items-start justify-between gap-4 mb-5">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-green-50 text-[#2E7D32] flex items-center justify-center flex-shrink-0 border border-green-100">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 border border-emerald-100">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-extrabold text-gray-900">
+                    <h3 className="text-lg font-extrabold text-slate-900">
                       ¿Confirmar registro de empleado?
                     </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-slate-600 mt-0.5 font-medium">
                       Verifica los datos antes de aprovisionar las credenciales.
                     </p>
                   </div>
                 </div>
-                <span className="bg-gray-100 text-gray-700 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                <span className="bg-slate-100 text-slate-800 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider whitespace-nowrap flex-shrink-0">
                   {formData.numeroDocumento}
                 </span>
               </div>
 
-              <div className="bg-[#F8FAFC] border border-gray-200/80 rounded-xl p-4 space-y-3 text-xs my-6">
-                <div className="flex justify-between gap-4 border-b border-gray-200/60 pb-2.5">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Empleado</span>
-                  <span className="font-bold text-gray-900 text-right">{formData.nombres} {formData.apellidos}</span>
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 space-y-3.5 text-xs my-6">
+                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Empleado</span>
+                  <span className="font-extrabold text-slate-900 text-right">{formData.nombres} {formData.apellidos}</span>
                 </div>
 
-                <div className="flex justify-between gap-4 border-b border-gray-200/60 pb-2.5">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Contacto Personal</span>
-                  <span className="font-medium text-gray-700 text-right">{formData.telefono} &bull; {formData.correoPersonal}</span>
+                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Contacto personal</span>
+                  <span className="font-semibold text-slate-800 text-right">{formData.telefono} &bull; {formData.correoPersonal}</span>
                 </div>
 
-                <div className="flex justify-between gap-4 border-b border-gray-200/60 pb-2.5">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Distrito</span>
-                  <span className="font-medium text-gray-700 text-right">{getDistritoTexto()}</span>
+                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Sede operativa</span>
+                  <span className="font-semibold text-slate-800 text-right">{getSedeTexto()}</span>
                 </div>
 
-                <div className="flex justify-between gap-4 border-b border-gray-200/60 pb-2.5">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Área Asignada</span>
-                  <span className="font-semibold text-gray-800 text-right">{getAreaTexto()}</span>
+                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Área asignada</span>
+                  <span className="font-bold text-slate-800 text-right">{getAreaTexto()}</span>
                 </div>
 
                 <div className="flex justify-between items-center gap-4 pt-0.5">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Puesto / Cargo</span>
-                  <span className="bg-green-50 text-[#2E7D32] border border-green-200 px-2.5 py-0.5 rounded-full font-bold text-[11px]">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Puesto / cargo</span>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md font-bold text-[11px]">
                     {getCargoTexto()}
                   </span>
                 </div>
@@ -1121,17 +1160,17 @@ function RegistroEmpleado() {
                   type="button"
                   onClick={() => setModalConfirmar(false)}
                   disabled={isLoading}
-                  className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors disabled:opacity-50"
                 >
-                  Revisar Datos
+                  Revisar datos
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmarRegistro}
                   disabled={isLoading}
-                  className="px-6 py-2.5 text-sm font-bold text-white bg-black hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
                 >
-                  {isLoading ? 'Procesando...' : 'Sí, Registrar Empleado'}
+                  {isLoading ? 'Procesando...' : 'Sí, registrar empleado'}
                 </button>
               </div>
             </div>

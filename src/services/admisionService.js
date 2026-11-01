@@ -48,12 +48,16 @@ export const admisionService = {
     return await request(`/api/v1/oferta-academica/nuevo-ingreso?idPensum=${idPensum}&idSede=${idSede}`);
   },
 
-  // 5. Verificar si la persona ya existe en la base de datos
-  buscarPersonaPorDocumento: async (documento) => {
-    const res = await fetch(`${API_URL}/api/v1/personas/buscar-por-documento?numeroDocumento=${encodeURIComponent(documento)}`);
-    if (res.status === 404 || res.status === 204) return null;
-    if (!res.ok) throw new Error('Error al verificar documento');
-    return await res.json();
+  // 5. CORREGIDO: Usar el endpoint público de verificación de identidad sin error 403
+  buscarPersonaPorDocumento: async (documento, idTipoDocumento = 1) => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/public/admision-online/verificar-identidad?idTipoDocumento=${idTipoDocumento}&numeroDocumento=${encodeURIComponent(documento)}`);
+      if (res.status === 404 || res.status === 204) return null;
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
   },
 
   // 6. Pre-matrícula Online (Regla 1+1: Matrícula + Cuota 1 = $140.00)
