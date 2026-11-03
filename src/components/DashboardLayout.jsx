@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { menuMaestro } from '../config/menuConfig'; 
+import apiInterceptor from '../services/apiInterceptor';
+
 
 function DashboardLayout() {
   const navigate = useNavigate();
@@ -14,12 +16,43 @@ function DashboardLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  // Estado para la foto obtenido directamente de la API
+  const [urlFoto, setUrlFoto] = useState('');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Cargar perfil al montar el layout para obtener la foto real
+    obtenerFotoPerfil();
+
+    // Escuchar el evento personalizado cuando se actualice la foto en Ajustes
+    const handleFotoActualizada = (e) => {
+      if (e.detail) setUrlFoto(e.detail);
+    };
+    window.addEventListener('fotoActualizada', handleFotoActualizada);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('fotoActualizada', handleFotoActualizada);
+    };
   }, []);
+
+  const obtenerFotoPerfil = async () => {
+    try {
+      const response = await apiInterceptor('/api/v1/ajustes/perfil');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.urlFoto) {
+          setUrlFoto(data.urlFoto);
+          localStorage.setItem('urlFoto', data.urlFoto); // Opcional por si acaso
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener la foto de perfil en el layout');
+    }
+  };
 
   const nombreCompletoRaw = localStorage.getItem('nombreCompleto') || 'Cargando...';
 
@@ -88,7 +121,6 @@ function DashboardLayout() {
           ${isMobile ? 'fixed top-0 left-0 bottom-0' : 'relative'}
         `}
       >
-        {/* Se aplica CSS para ocultar la barra de scroll (scrollbar) manteniendo la funcionalidad */}
         <div className="overflow-y-auto overflow-x-hidden flex-1 flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className={`pt-8 pb-6 px-6 flex items-center ${visuallyMinimized ? 'justify-center px-0' : 'justify-between'}`}>
             <AnimatePresence mode="wait">
@@ -163,8 +195,14 @@ function DashboardLayout() {
         <div className="p-4">
           <div className={`bg-slate-50 border border-slate-200 rounded-[20px] transition-all duration-300 ${visuallyMinimized ? 'p-2' : 'p-4'}`}>
             <div className={`flex items-center ${visuallyMinimized ? 'justify-center' : 'space-x-3 mb-4'}`}>
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-200 border border-white shadow-sm flex items-center justify-center font-extrabold text-slate-800 text-lg">
-                {inicialUsuario}
+              
+              {/* Avatar: Muestra la foto de la API si existe, sino la inicial */}
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-200 border border-white shadow-sm flex items-center justify-center font-extrabold text-slate-800 text-lg overflow-hidden">
+                {urlFoto ? (
+                  <img src={`${import.meta.env.VITE_API_URL}${urlFoto}`} alt="Perfil" className="w-full h-full object-cover" />
+                ) : (
+                  inicialUsuario
+                )}
               </div>
               
               {!visuallyMinimized && (

@@ -27,6 +27,7 @@ import CiclosPlanificacion from './pages/academico/CiclosPlanificacion';
 import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
+import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
 
 // Nueva vista pública de admisión
 import AdmisionOnline from './pages/academico/AdmisionOnline';
@@ -165,7 +166,6 @@ function App() {
           <Route index element={<Navigate to="inicio" replace />} />
           
           <Route path="inicio" element={<Inicio />} />
-          <Route path="clases" element={<div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>} />
           <Route path="notas" element={<IngresoNotas />} />
           <Route path="mis-notas" element={<ConsultaNotas />} />
           
@@ -234,10 +234,10 @@ function App() {
             </RutaPorRol>
           } />
 
-          {/* Portal Docente y Estudiante */}
+          {/* Portal Estudiante (Mis Clases y Pensum) */}
           <Route path="clases" element={
-            <RutaPorRol rolesPermitidos={['DOCENTE', 'ESTUDIANTE', 'ADMINISTRADOR']}>
-              <div className="p-4 text-2xl font-bold">Vista de Mis Clases en construcción</div>
+            <RutaPorRol rolesPermitidos={['ESTUDIANTE']}>
+              <MisClasesPensum />
             </RutaPorRol>
           } />
 
