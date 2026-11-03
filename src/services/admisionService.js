@@ -1,17 +1,16 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const RAW_API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = RAW_API_URL.replace(/\/+$/, '');
 
 async function request(endpoint, options = {}) {
-  const url = `${API_URL}${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_URL}${cleanEndpoint}`;
+
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
-
+  const response = await fetch(url, { ...options, headers });
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -23,44 +22,23 @@ async function request(endpoint, options = {}) {
     err.data = data;
     throw err;
   }
-
   return data;
 }
 
 export const admisionService = {
-  // 1. Obtener catálogos públicos para admisión
-  getCatalogos: async () => {
-    return await request('/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras');
+  // 1. Catálogos públicos y oferta académica
+  getCatalogos: async () => request('/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras'),
+  getDistritos: async (idDepartamento) => request(`/api/v1/catalogos/distritos?padreId=${idDepartamento}`),
+  getPensumVigente: async (idCarreraSede) => request(`/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${encodeURIComponent(idCarreraSede)}`),
+  getOfertaNuevoIngreso: async (idPensum, idSede) => request(`/api/v1/oferta-academica/nuevo-ingreso?idPensum=${encodeURIComponent(idPensum)}&idSede=${encodeURIComponent(idSede)}`),
+
+  // 2. Fail-Fast en Paso 1: Valida restricciones institucionales
+  verificarIdentidad: async (idTipoDocumento = 1, numeroDocumento) => {
+    const params = new URLSearchParams({ idTipoDocumento: String(idTipoDocumento), numeroDocumento: numeroDocumento.trim() });
+    return await request(`/api/v1/public/admision-online/verificar-identidad?${params.toString()}`);
   },
 
-  // 2. Obtener distritos por departamento
-  getDistritos: async (idDepartamento) => {
-    return await request(`/api/v1/catalogos/distritos?padreId=${idDepartamento}`);
-  },
-
-  // 3. Obtener pensum vigente de la carrera
-  getPensumVigente: async (idCarreraSede) => {
-    return await request(`/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${idCarreraSede}`);
-  },
-
-  // 4. Obtener oferta de grupos y cupos para nuevo ingreso
-  getOfertaNuevoIngreso: async (idPensum, idSede) => {
-    return await request(`/api/v1/oferta-academica/nuevo-ingreso?idPensum=${idPensum}&idSede=${idSede}`);
-  },
-
-  // 5. CORREGIDO: Usar el endpoint público de verificación de identidad sin error 403
-  buscarPersonaPorDocumento: async (documento, idTipoDocumento = 1) => {
-    try {
-      const res = await fetch(`${API_URL}/api/v1/public/admision-online/verificar-identidad?idTipoDocumento=${idTipoDocumento}&numeroDocumento=${encodeURIComponent(documento)}`);
-      if (res.status === 404 || res.status === 204) return null;
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
-  },
-
-  // 6. Pre-matrícula Online (Regla 1+1: Matrícula + Cuota 1 = $140.00)
+  // 3. Fase 1: Reserva de cupos (Ya no envía modalidadPago)
   procesarPreMatricula: async (payload) => {
     return await request('/api/v1/public/admision-online/pre-matricular', {
       method: 'POST',
@@ -68,21 +46,37 @@ export const admisionService = {
     });
   },
 
-  // 7. Liquidación de Pago en Línea (Idempotente)
-  liquidarPagoOnline: async (idMatricula, datosTarjeta, idempotencyKey = crypto.randomUUID()) => {
+  // 4. Fase 1.5: Desacoplamiento NPE (Ejecutado solo si elige Ventanilla)
+  generarBoletaNpe: async (idMatricula) => {
+    return await request(`/api/v1/public/admision-online/${encodeURIComponent(idMatricula)}/generar-boleta-npe`, {
+      method: 'POST'
+    });
+  },
+
+  // 5. Fase 2: Liquidación Online Segura (Idempotente)
+  liquidarPagoOnline: async (payloadPago, idempotencyKey) => {
+    const key = idempotencyKey || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `IDEMP-${Date.now()}`);
     return await request('/api/v1/public/admision-online/pagar-orden', {
       method: 'POST',
-      headers: {
-        'Idempotency-Key': idempotencyKey
-      },
+      headers: { 'Idempotency-Key': key },
       body: JSON.stringify({
-        idMatricula,
-        numeroTarjeta: datosTarjeta.numeroTarjeta.replace(/\s+/g, ''),
-        titularTarjeta: datosTarjeta.titularTarjeta.trim().toUpperCase(),
-        fechaExpiracion: datosTarjeta.fechaExpiracion,
-        cvv: datosTarjeta.cvv,
-        cuotasAPagar: 1 // Regla 1+1
+        idMatricula: Number(payloadPago.idMatricula),
+        cuotasAPagar: Number(payloadPago.cuotasAPagar || 1),
+        numeroTarjeta: String(payloadPago.numeroTarjeta).replace(/\s+/g, ''),
+        
+        // CORRECCIÓN DE CONTRATO AQUÍ: El DTO de Java espera "titularTarjeta", no "titular"
+        titularTarjeta: String(payloadPago.titular).trim().toUpperCase(),
+        
+        fechaExpiracion: String(payloadPago.fechaExpiracion).trim(),
+        cvv: String(payloadPago.cvv).trim()
       })
+    });
+  },
+
+  // 6. Rollback Explícito: Requerido para el botón "Atrás" del Paso 3
+  cancelarPreMatricula: async (idMatricula) => {
+    return await request(`/api/v1/public/admision-online/cancelar/${encodeURIComponent(idMatricula)}`, {
+      method: 'DELETE'
     });
   }
 };

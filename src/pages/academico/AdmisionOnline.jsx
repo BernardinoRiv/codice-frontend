@@ -17,9 +17,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
+  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
   const filtrados = options.filter(item => (item.nombre || '').toLowerCase().includes(search.toLowerCase()));
   const seleccionado = options.find(item => String(item.id) === String(value));
@@ -126,8 +124,7 @@ const validarDUI = (dui) => {
     suma += digits[i] * (9 - i);
   }
   const mod = suma % 10;
-  const esperado = mod === 0 ? 0 : 10 - mod;
-  return verificador === esperado;
+  return verificador === (mod === 0 ? 0 : 10 - mod);
 };
 
 const formatearDUIInput = (val) => {
@@ -164,9 +161,9 @@ export default function AdmisionOnline() {
   const [erroresPaso1, setErroresPaso1] = useState({});
   const [catalogos, setCatalogos] = useState({ tiposDocumento: [], sedes: [], departamentos: [], carreras: [] });
   const [distritos, setDistritos] = useState([]);
+  const [validandoDocumento, setValidandoDocumento] = useState(false);
 
   const [boletaFinalizada, setBoletaFinalizada] = useState(false);
-  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
   const [sedeSeleccionada, setSedeSeleccionada] = useState('');
   const [carreraSeleccionada, setCarreraSeleccionada] = useState('');
@@ -177,14 +174,8 @@ export default function AdmisionOnline() {
 
   const [modalidadPago, setModalidadPago] = useState('EN_LINEA'); 
   const [matriculaGenerada, setMatriculaGenerada] = useState(null);
-  const [idempotencyKey] = useState(crypto.randomUUID());
 
-  const [cardData, setCardData] = useState({
-    numero: '',
-    titular: '',
-    expiracion: '',
-    cvv: ''
-  });
+  const [cardData, setCardData] = useState({ numero: '', titular: '', expiracion: '', cvv: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmacionPago, setConfirmacionPago] = useState(null);
 
@@ -244,6 +235,7 @@ export default function AdmisionOnline() {
       .finally(() => setCargandoOferta(false));
   }, [pensumVigente, sedeSeleccionada]);
 
+  // VALIDACIÓN FAIL-FAST: Protege la base de datos y la UX
   const handleNextStep1 = async () => {
     const err = {};
     if (!validarDUI(personalData.numeroDocumento)) err.numeroDocumento = 'DUI inválido';
@@ -257,25 +249,35 @@ export default function AdmisionOnline() {
     setErroresPaso1(err);
     if (Object.keys(err).length > 0) return;
 
+    setValidandoDocumento(true);
     try {
-      const persona = await admisionService.buscarPersonaPorDocumento(personalData.numeroDocumento);
-      if (persona) {
+      const authVerif = await admisionService.verificarIdentidad(personalData.idTipoDocumento, personalData.numeroDocumento);
+      
+      if (authVerif?.requiereLogin || (authVerif?.mensaje && authVerif.mensaje.includes('Ya posees una pre-matrícula'))) {
+        toast.error('Acceso denegado', { description: authVerif.mensaje });
+        setErroresPaso1({ numeroDocumento: authVerif.mensaje });
+        return; // Detiene el avance
+      }
+
+      if (authVerif?.existePersona && authVerif.idPersona) {
         setPersonalData(p => ({
           ...p,
-          idPersona: persona.idPersona || persona.id,
-          nombres: persona.nombres,
-          apellidos: persona.apellidos
+          idPersona: authVerif.idPersona,
+          nombres: authVerif.nombres || p.nombres,
+          apellidos: authVerif.apellidos || p.apellidos
         }));
       }
-    } catch {}
-
-    setPaso(2);
+      setPaso(2);
+    } catch (err) {
+      toast.error('Error', { description: err.message || 'Error de conexión' });
+    } finally {
+      setValidandoDocumento(false);
+    }
   };
 
   const toggleGrupo = (idGrupo, idMateria) => {
     const materia = ofertaAcademica.find(m => m.idMateria === idMateria);
     const gruposMateria = materia ? materia.gruposDisponibles.map(g => g.idGrupo) : [];
-
     if (gruposSeleccionados.includes(idGrupo)) {
       setGruposSeleccionados(gruposSeleccionados.filter(id => id !== idGrupo));
     } else {
@@ -284,26 +286,31 @@ export default function AdmisionOnline() {
     }
   };
 
+  // SANITIZACIÓN DE DATOS (Evita HTTP 400 Bad Request)
   const handleCrearPreMatricula = async () => {
+    if (!sedeSeleccionada || !carreraSeleccionada || !pensumVigente?.idPensum) {
+      toast.error('Datos incompletos', { description: 'Selecciona sede y carrera.' });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const payload = {
-        idPersona: personalData.idPersona,
-        idTipoDocumento: Number(personalData.idTipoDocumento),
-        numeroDocumento: personalData.numeroDocumento,
-        nombres: personalData.nombres,
-        apellidos: personalData.apellidos,
-        fechaNacimiento: personalData.fechaNacimiento,
-        sexo: personalData.sexo,
-        telefono: personalData.telefono,
-        correoPersonal: personalData.correoPersonal,
+        idPersona: personalData.idPersona ? Number(personalData.idPersona) : null,
+        idTipoDocumento: Number(personalData.idTipoDocumento) || 1,
+        numeroDocumento: personalData.numeroDocumento.trim(),
+        nombres: personalData.nombres.trim(),
+        apellidos: personalData.apellidos.trim(),
+        fechaNacimiento: personalData.fechaNacimiento, // Debe ser YYYY-MM-DD
+        sexo: personalData.sexo || 'F',
+        telefono: personalData.telefono.trim(),
+        correoPersonal: personalData.correoPersonal.trim().toLowerCase(),
         idDistrito: Number(personalData.idDistrito),
-        direccion: personalData.direccion,
+        direccion: personalData.direccion?.trim() || 'No especificada',
         idSede: Number(sedeSeleccionada),
         idCarreraSede: Number(carreraSeleccionada),
         idPensum: Number(pensumVigente.idPensum),
-        idGruposSeleccionados: gruposSeleccionados,
-        modalidadPago: modalidadPago
+        idGruposSeleccionados: gruposSeleccionados.map(Number)
       };
 
       const res = await admisionService.procesarPreMatricula(payload);
@@ -312,8 +319,8 @@ export default function AdmisionOnline() {
         idMatricula: res.idMatricula,
         estudiante: `${personalData.nombres} ${personalData.apellidos}`,
         documento: personalData.numeroDocumento,
-        totalAPagar: res.totalAPagar,
-        npe: res.npe,
+        totalAPagar: res.totalAPagar || 140.00,
+        npe: res.npe, // Puede venir null temporalmente
         fechaVencimiento: res.fechaVencimiento,
         cargosCiclo: [
           { id: 1, concepto: 'Matrícula', cuota: 1, monto: 70.0, obligatoria: true },
@@ -327,7 +334,7 @@ export default function AdmisionOnline() {
 
       setPaso(3);
     } catch (err) {
-      toast.error('Error al procesar');
+      toast.error('Fallo en reserva', { description: err.message || 'Intente nuevamente' });
     } finally {
       setIsProcessing(false);
     }
@@ -337,21 +344,23 @@ export default function AdmisionOnline() {
     if (!cardData.numero || !cardData.titular || !cardData.expiracion || !cardData.cvv) return;
 
     setIsProcessing(true);
-    try {
-      const res = await admisionService.liquidarPagoOnline(
-        matriculaGenerada.idMatricula,
-        {
-          numeroTarjeta: cardData.numero,
-          titularTarjeta: cardData.titular,
-          fechaExpiracion: cardData.expiracion,
-          cvv: cardData.cvv
-        },
-        idempotencyKey
-      );
+    // Generación dinámica del UUID por intento
+    const key = crypto.randomUUID(); 
 
+    try {
+      const payloadPago = {
+        idMatricula: matriculaGenerada.idMatricula,
+        cuotasAPagar: 1, 
+        numeroTarjeta: cardData.numero,
+        titular: cardData.titular,
+        fechaExpiracion: cardData.expiracion,
+        cvv: cardData.cvv
+      };
+
+      const res = await admisionService.liquidarPagoOnline(payloadPago, key);
       setConfirmacionPago(res);
     } catch (err) {
-      toast.error('Transacción denegada');
+      toast.error('Transacción denegada', { description: err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -393,14 +402,12 @@ export default function AdmisionOnline() {
 
       <main className="w-full max-w-[1000px] mx-auto px-6 pb-20">
         
-        {/* ENVOLTORIO DE ANIMACIÓN PARA LAS PESTAÑAS */}
         <div key={activeTab} className="animate-in fade-in slide-in-from-bottom-8 duration-500 ease-out">
           
           {activeTab === 'estudiante' ? (
             <div>
               <div className="max-w-3xl mx-auto mb-16 px-4">
                 <div className="flex items-start justify-between w-full relative">
-                  {/* LÍNEAS DEL STEPPER CORREGIDAS (z-0 y top-6 absoluto) */}
                   <div className="absolute top-6 left-0 w-full h-[2px] bg-slate-200 z-0"></div>
                   <div className="absolute top-6 left-0 h-[2px] bg-slate-900 transition-all duration-500 ease-in-out z-0" style={{ width: `${((paso - 1) / 3) * 100}%` }}></div>
                   
@@ -410,7 +417,6 @@ export default function AdmisionOnline() {
                     { num: 3, label: 'Plan financiero', desc: 'Matrícula + Mes 1' },
                     { num: 4, label: 'Confirmación', desc: 'Credenciales IAM' }
                   ].map((item) => (
-                    // z-10 y bg-slate-50 aseguran que la línea quede por detrás y no cruce el número visualmente
                     <div key={item.num} className="flex flex-col items-center bg-slate-50 px-2 sm:px-4 relative z-10">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 shadow-sm ${
                         paso >= item.num ? 'bg-slate-900 text-white ring-4 ring-slate-100' : 'bg-white text-slate-400 border-2 border-slate-200'
@@ -452,7 +458,10 @@ export default function AdmisionOnline() {
                         type="text"
                         maxLength={10}
                         value={personalData.numeroDocumento}
-                        onChange={(e) => setPersonalData({ ...personalData, numeroDocumento: formatearDUIInput(e.target.value) })}
+                        onChange={(e) => {
+                          setPersonalData({ ...personalData, numeroDocumento: formatearDUIInput(e.target.value) });
+                          setErroresPaso1(prev => ({...prev, numeroDocumento: null}));
+                        }}
                         placeholder="00000000-0"
                         className={`${inputClass} font-mono tracking-widest ${erroresPaso1.numeroDocumento ? 'border-red-400 focus:border-red-500 focus:ring-red-100 bg-red-50/30' : ''}`}
                       />
@@ -561,8 +570,12 @@ export default function AdmisionOnline() {
                   </div>
 
                   <div className="mt-12 pt-6 border-t border-slate-100 flex justify-end">
-                    <button onClick={handleNextStep1} className="w-full sm:w-auto h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm">
-                      Siguiente paso
+                    <button 
+                      onClick={handleNextStep1} 
+                      disabled={validandoDocumento}
+                      className="w-full sm:w-auto h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {validandoDocumento ? 'Verificando...' : 'Siguiente paso'}
                     </button>
                   </div>
                 </div>
@@ -657,7 +670,11 @@ export default function AdmisionOnline() {
                     <button onClick={() => setPaso(1)} className="h-[50px] px-8 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
                       Atrás
                     </button>
-                    <button onClick={handleCrearPreMatricula} disabled={isProcessing || gruposSeleccionados.length === 0} className="h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50">
+                    <button 
+                      onClick={handleCrearPreMatricula} 
+                      disabled={isProcessing || gruposSeleccionados.length === 0} 
+                      className="h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+                    >
                       {isProcessing ? 'Procesando...' : 'Generar plan financiero'}
                     </button>
                   </div>
@@ -688,6 +705,7 @@ export default function AdmisionOnline() {
                       <h4 className="font-extrabold text-slate-900 text-sm mb-1">En línea</h4>
                       <p className="text-[11px] font-medium text-slate-500">Tarjeta de crédito/débito.</p>
                     </div>
+                    
                     <div onClick={() => setModalidadPago('VENTANILLA')} className={`p-6 rounded-2xl border cursor-pointer transition-all ${modalidadPago === 'VENTANILLA' ? 'border-slate-900 ring-1 ring-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
                       <div className="flex items-center justify-between mb-4">
                         <svg className="w-8 h-8 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -699,11 +717,56 @@ export default function AdmisionOnline() {
                   </div>
 
                   <div className="mt-12 pt-6 border-t border-slate-100 flex justify-between items-center">
-                    <button onClick={() => setPaso(2)} className="h-[50px] px-8 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
+                    
+                    {/* 1. BOTÓN ATRÁS CON ROLLBACK EXPLÍCITO (LIBERACIÓN DE RECURSOS) */}
+                    <button 
+                      onClick={async () => {
+                        setIsProcessing(true);
+                        try {
+                          // Llamada al backend para destruir la matrícula 38 (ejemplo) y liberar cupos
+                          await admisionService.cancelarPreMatricula(matriculaGenerada.idMatricula);
+                          
+                          // Limpiar el estado en React
+                          setMatriculaGenerada(null);
+                          
+                          // Retroceder de forma segura
+                          setPaso(2);
+                          toast.info('Modificación habilitada', { description: 'Tus cupos anteriores fueron liberados.' });
+                        } catch (err) {
+                          toast.error('Error al retroceder', { description: 'No se pudo liberar el plan financiero actual.' });
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                      disabled={isProcessing}
+                      className="h-[50px] px-8 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors disabled:opacity-50"
+                    >
                       Atrás
                     </button>
-                    <button onClick={() => setPaso(4)} className="h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm">
-                      Continuar
+
+                    {/* 2. DESACOPLAMIENTO NPE: Solo genera el correo al confirmar ventanilla en este paso */}
+                    <button 
+                      onClick={async () => {
+                        if (modalidadPago === 'EN_LINEA') {
+                          setPaso(4);
+                        } else {
+                          setIsProcessing(true);
+                          try {
+                            const res = await admisionService.generarBoletaNpe(matriculaGenerada.idMatricula);
+                            setMatriculaGenerada(prev => ({ ...prev, npe: res.npe }));
+                            toast.success('Boleta Generada', { description: res.mensaje || 'Enviada por correo' });
+                            setPaso(4);
+                          } catch (err) {
+                            toast.error('Error', { description: 'No se pudo generar la boleta NPE.' });
+                          } finally {
+                            setIsProcessing(false);
+                          }
+                        }
+                      }}
+                      disabled={isProcessing} 
+                      className="h-[50px] px-10 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Procesando...' : 'Continuar'}
                     </button>
                   </div>
                 </div>
@@ -713,7 +776,7 @@ export default function AdmisionOnline() {
                 <div className="max-w-xl mx-auto bg-white rounded-3xl p-8 sm:p-12 shadow-sm border border-slate-200 animate-in fade-in zoom-in-95 duration-300">
                   <div className="text-center mb-10">
                     <h2 className="text-2xl font-inter font-extrabold text-slate-900 mb-2">Pago seguro</h2>
-                    <p className="text-xs font-medium text-slate-500">Monto a debitar: <span className="font-extrabold text-slate-900">$140.00</span></p>
+                    <p className="text-xs font-medium text-slate-500">Monto a debitar: <span className="font-extrabold text-slate-900">${matriculaGenerada.totalAPagar.toFixed(2)}</span></p>
                   </div>
 
                   <div className="space-y-5">
@@ -938,4 +1001,4 @@ export default function AdmisionOnline() {
       </main>
     </div>
   );
-} 
+}
