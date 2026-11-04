@@ -29,8 +29,12 @@ import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
 
+
 // Nueva vista pública de admisión
 import AdmisionOnline from './pages/academico/AdmisionOnline';
+
+// Nueva vista dashboard
+import InicioGerencia from './pages/inicio/inicioGerencia';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
 const normalizarRol = (rol = '') => {
@@ -275,6 +279,12 @@ function App() {
           <Route path="aranceles" element={
             <RutaPorRol rolesPermitidos={['FINANZAS', 'ADMINISTRADOR']}>
               <CatalogoAranceles />
+            </RutaPorRol>
+          } />
+
+          <Route path="gerencia" element={
+            <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'DIRECTOR_REGIONAL']}>
+              <InicioGerencia />
             </RutaPorRol>
           } />
         </Route>
