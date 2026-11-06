@@ -11,17 +11,21 @@ import { dashboardService } from '../../services/dashboardService';
 const COLORES_FACULTAD = ['#1e40af', '#3b82f6', '#10b981', '#f59e0b'];
 const COLORES_CONTRATO = ['#3b82f6', '#94a3b8', '#10b981', '#f59e0b'];
 
+
 export default function InicioGerencia() {
   const [cargando, setCargando] = useState(true);
   const [kpiActivo, setKpiActivo] = useState('matricula'); // Estado para el drill-down
   const [cicloSeleccionado, setCicloSeleccionado] = useState('2-2026B');
   const [datosKpi, setDatosKpi] = useState(null);
+  const [granularidad, setGranularidad] = useState('semanal');
 
   // Llamada real al backend (BFF / API Gateway)
+  // Llamada real al backend con soporte para granularidad y ciclo
   const cargarDatos = async () => {
     setCargando(true);
     try {
-      const data = await dashboardService.obtenerMetricasGerenciales(cicloSeleccionado);
+      // Inyectamos tanto el ciclo como la granularidad seleccionada al servicio
+      const data = await dashboardService.obtenerMetricasGerenciales(cicloSeleccionado, granularidad);
       
       // Cálculo financiero derivado seguro
       const totalPendiente = (data.totalFacturado || 0) - (data.totalRecaudado || 0);
@@ -39,7 +43,7 @@ export default function InicioGerencia() {
 
   useEffect(() => {
     cargarDatos();
-  }, [cicloSeleccionado]);
+  }, [cicloSeleccionado, granularidad]);
 
   // Datos financieros mapeados del backend real
   const datosFinancierosBackend = [
@@ -61,12 +65,27 @@ export default function InicioGerencia() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-in slide-in-from-bottom-4 duration-500">
         
         {/* Gráfico 1: Asistencia Promedio Semanal (Indicador Dinámico en Líneas) */}
+        
+        {/* Gráfico 1: Asistencia Promedio Semanal (Indicador Dinámico en Líneas) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-900">Asistencia Promedio Semanal</h3>
-            <p className="text-sm text-slate-500 font-medium">Monitoreo activo para prevención de deserción</p>
-          </div>
           
+          {/* Cabecera con título y selector de granularidad */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Asistencia Institucional</h3>
+              <p className="text-sm text-slate-500 font-medium">Monitoreo de asistencia por período</p>
+            </div>
+            <select 
+              value={granularidad} 
+              onChange={(e) => setGranularidad(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl px-3 py-1.5 outline-none font-semibold cursor-pointer"
+            >
+              <option value="diario">Diaria</option>
+              <option value="semanal">Semanal</option>
+              <option value="mensual">Mensual</option>
+            </select>
+          </div>
+
           {datosKpi?.asistenciaSemanal?.length > 0 ? (
             <div className="h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -98,27 +117,28 @@ export default function InicioGerencia() {
           )}
         </div>
 
-        {/* Gráfico 2: Distribución por Facultad (Dona con etiquetas y lectura central) */}
+        {/* Gráfico 2: Distribución por Facultad (Dona con datos reales del Backend) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center">
           <h3 className="text-lg font-bold text-slate-900 mb-6 w-full text-left">Distribución por Facultad</h3>
           
-          {datosMatriculaFacultad?.length > 0 ? (
+          {datosKpi?.distribucionMatricula?.length > 0 ? (
             <>
               <div className="h-[230px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie 
-                      data={datosMatriculaFacultad} 
+                      data={datosKpi.distribucionMatricula} 
                       innerRadius={55} 
                       outerRadius={80} 
                       paddingAngle={3} 
-                      dataKey="value" 
+                      dataKey="cantidad" 
+                      nameKey="nombre" 
                       stroke="none"
                       labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {datosMatriculaFacultad.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color || COLORES_FACULTAD[index % COLORES_FACULTAD.length]} />
+                      {datosKpi.distribucionMatricula.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORES_FACULTAD[index % COLORES_FACULTAD.length]} />
                       ))}
                     </Pie>
                     <Tooltip 
@@ -136,22 +156,22 @@ export default function InicioGerencia() {
                 </div>
               </div>
 
-              {/* Leyenda Semántica HTML inferior */}
+              {/* Leyenda Semántica HTML inferior con propiedades correctas */}
               <div className="mt-2 w-full space-y-2">
-                {datosMatriculaFacultad.map((item, idx) => (
+                {datosKpi.distribucionMatricula.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center text-sm w-full">
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: item.color || COLORES_FACULTAD[idx % COLORES_FACULTAD.length] }}></div>
-                      <span className="text-slate-600 font-medium truncate max-w-[120px]" title={item.name}>{item.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: COLORES_FACULTAD[idx % COLORES_FACULTAD.length] }}></div>
+                      <span className="text-slate-600 font-medium truncate max-w-[120px]" title={item.nombre}>{item.nombre}</span>
                     </div>
-                    <span className="font-bold text-slate-900">{item.value.toLocaleString()}</span>
+                    <span className="font-bold text-slate-900">{item.cantidad.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
             </>
           ) : (
             <div className="h-[250px] w-full flex items-center justify-center text-slate-400 font-medium bg-slate-50 rounded-xl border border-dashed border-slate-200 mt-2">
-              Sin registros de facultades.
+              Sin registros de facultades en este ciclo.
             </div>
           )}
         </div>
