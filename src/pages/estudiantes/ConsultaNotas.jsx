@@ -7,6 +7,14 @@ const ConsultaNotas = () => {
   const [datosCiclo, setDatosCiclo] = useState(null);
   const [historial, setHistorial] = useState(null);
   const [cargando, setCargando] = useState(true);
+  
+  // Estado local para los datos del estudiante dinámicos
+  const [carnetEstudiante, setCarnetEstudiante] = useState(
+    localStorage.getItem('carnet') || 'AM260028'
+  );
+  const [nombreEstudiante, setNombreEstudiante] = useState(
+    localStorage.getItem('nombreCompleto') || 'Miguel Aguilar'
+  );
 
   useEffect(() => {
     cargarDatos();
@@ -44,6 +52,17 @@ const ConsultaNotas = () => {
 
       setDatosCiclo(dataNotas);
       setHistorial(dataHistorial);
+
+      // Si el historial o los datos devuelven información del estudiante real, la actualizamos dinámicamente
+      if (dataHistorial?.carnet) {
+        setCarnetEstudiante(dataHistorial.carnet);
+        localStorage.setItem('carnet', dataHistorial.carnet);
+      }
+      if (dataHistorial?.nombreCompleto) {
+        setNombreEstudiante(dataHistorial.nombreCompleto);
+        localStorage.setItem('nombreCompleto', dataHistorial.nombreCompleto);
+      }
+
     } catch (error) {
       toast.error('Error de carga', { description: error.message });
     } finally {
@@ -55,8 +74,8 @@ const ConsultaNotas = () => {
     if (!datosCiclo) return;
 
     const estudiante = {
-      carnet: localStorage.getItem('carnet') || 'SA00000000',
-      nombre: localStorage.getItem('nombreCompleto') || 'Estudiante',
+      carnet: carnetEstudiante,
+      nombre: nombreEstudiante,
       carrera: historial?.carrera || 'No asignada',
       cum: historial?.cumAcumulado || 0,
       uv: historial?.uvAcumuladas || 0
@@ -81,9 +100,6 @@ const ConsultaNotas = () => {
     if (estado === 'Cursando') return 'text-blue-700 bg-blue-50 border-blue-200';
     return 'text-gray-700 bg-gray-50 border-gray-200';
   };
-
-  const nombreCompleto = localStorage.getItem('nombreCompleto') || 'Estudiante';
-  const carnet = localStorage.getItem('carnet') || 'SA00000000';
 
   if (cargando) return (
     <div className="flex flex-col items-center justify-center pt-20">
@@ -121,8 +137,8 @@ const ConsultaNotas = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Estudiante</p>
-            <p className="text-sm font-semibold text-gray-900 truncate">{nombreCompleto}</p>
-            <p className="text-[10px] font-mono text-gray-500">{carnet}</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">{nombreEstudiante}</p>
+            <p className="text-[10px] font-mono text-gray-500">{carnetEstudiante}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
@@ -287,7 +303,7 @@ const ConsultaNotas = () => {
                     <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-gray-900">{ciclo.codigoCiclo}</h3>
-                        <p className="text-[10px] text-gray-500">Año {ciclo.anio} • Ciclo {ciclo.numeroCiclo}</p>
+                        <p className="text-[10px] text-gray-500">Año {ciclo.anio} Ciclo {ciclo.numeroCiclo}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         ciclo.estadoCiclo === 'ACTIVO' 

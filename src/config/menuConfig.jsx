@@ -1,9 +1,6 @@
 import React from 'react';
 
 export const menuMaestro = [
-  // ==========================================
-  // 1. VISTAS GENERALES
-  // ==========================================
   { 
     name: 'Inicio', 
     path: '/dashboard/inicio', 
@@ -14,12 +11,8 @@ export const menuMaestro = [
       </svg>
     )
   },
-
-  // ==========================================
-  // 2. GESTIÓN INSTITUCIONAL (ADMIN / REGISTRO)
-  // ==========================================
   { 
-    name: 'Registro Empleado', 
+    name: 'Registro de empleado', 
     path: '/dashboard/registro-empleados', 
     rolesPermitidos: ['ADMINISTRADOR'], 
     icon: (
@@ -29,7 +22,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Registro Docente', 
+    name: 'Registro de docente', 
     path: '/dashboard/registro-docente',
     rolesPermitidos: ['ADMINISTRADOR'], 
     icon: (
@@ -40,7 +33,7 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Directorio Docentes', 
+    name: 'Directorio de docentes', 
     path: '/dashboard/directorio-docentes', 
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
     icon: (
@@ -50,23 +43,39 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Oferta Académica', 
+    name: 'Oferta académica', 
     path: '/dashboard/oferta-academica', 
-    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
+    rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO', 'ADMINISTRADOR'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
       </svg>
     )
   },
-
-  // ==========================================
-  // 3. GESTIÓN ACADÉMICA (AULAS Y CALIFICACIONES)
-  // ==========================================
+  {
+    name: 'Ciclos en planificación',
+    path: '/dashboard/ciclos-planificacion',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    )
+  },
   { 
-    name: 'Mis Clases', 
-    path: '/dashboard/clases', 
-    rolesPermitidos: ['DOCENTE', 'ESTUDIANTE', 'ADMINISTRADOR'], 
+    name: 'Gestión de secciones', 
+    path: '/dashboard/gestion-secciones', 
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'], 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    )
+  },
+{ 
+    name: 'Mis clases y pensum',
+    path: '/dashboard/clases',  
+    rolesPermitidos: ['ESTUDIANTE'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.905 59.905 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
@@ -76,15 +85,15 @@ export const menuMaestro = [
   { 
     name: 'Asistencias', 
     path: '/dashboard/asistencias', 
-    rolesPermitidos: ['DOCENTE', 'ADMINISTRADOR', 'REGISTRO_ACADEMICO'], 
+    rolesPermitidos: ['DOCENTE'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.905 59.905 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
       </svg>
     )
   },
   { 
-    name: 'Ingreso de Notas', 
+    name: 'Ingreso de notas', 
     path: '/dashboard/notas', 
     rolesPermitidos: ['DOCENTE'], 
     icon: (
@@ -94,7 +103,18 @@ export const menuMaestro = [
     )
   },
   { 
-    name: 'Mis Calificaciones', 
+    name: 'Registrar asistencia', 
+    path: '/dashboard/escanear-asistencia', 
+    rolesPermitidos: ['ESTUDIANTE'], 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75M13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
+      </svg>
+    )
+  },
+  { 
+    name: 'Mis calificaciones', 
     path: '/dashboard/mis-notas', 
     rolesPermitidos: ['ESTUDIANTE'], 
     icon: (
@@ -103,18 +123,56 @@ export const menuMaestro = [
       </svg>
     )
   },
-
-  // ==========================================
-  // 4. ADMINISTRACIÓN FINANCIERA
-  // ==========================================
   { 
-    name: 'Pagos y Aranceles', 
+    name: 'Pagos y aranceles', 
     path: '/dashboard/pagos', 
-    rolesPermitidos: ['ESTUDIANTE', 'FINANZAS', 'ADMINISTRADOR'], 
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'], 
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V4.245c0-.754-.726-1.294-1.453-1.096A60.07 60.07 0 0 1 2.25 5.25v13.5Zm15.975 1.282A48.682 48.682 0 0 0 21 12a48.65 48.65 0 0 0-2.775-5.032M3 15.75v-7.5m0 0v-.008m0 7.508v-.008m1.5-7.5h.008v.008H4.5v-.008m0 7.5h.008v.008H4.5v-.008" />
       </svg>
     )
   },
+  {
+    name: 'Mi estado de cuenta',
+    path: '/dashboard/mi-estado-cuenta',
+    rolesPermitidos: ['ESTUDIANTE'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    name: 'Ingreso de aspirantes',
+    path: '/dashboard/nuevo-ingreso',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+      </svg>
+    )
+  },
+  {
+    name: 'Aranceles',
+    path: '/dashboard/aranceles',
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    name: 'Métricas Gerenciales',
+    path: '/dashboard/gerencia',
+    // Ícono de gráfico (lucide-react o SVG puro)
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+      </svg>
+    ),
+    // Estricto control de acceso visual
+    rolesPermitidos: ['ADMINISTRADOR'] 
+  }
 ];

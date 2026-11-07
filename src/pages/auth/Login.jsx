@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import imagenFondo from '../../IMG_1534.JPG.jpeg';
@@ -85,9 +85,9 @@ function Login() {
 
       <div className="flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden w-full max-w-3xl min-h-[480px] z-20">
         <div className="hidden md:flex md:w-5/12 relative">
-          <img 
+          <img
             src={imagenFondo}
-            alt="Fondo Institucional UMA" 
+            alt="Fondo Institucional UMA"
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
@@ -147,9 +147,9 @@ function Login() {
             </div>
 
             <div className="flex justify-end text-sm mt-2 mb-6">
-              <a href="#" className="text-gray-500 hover:text-black transition">
+              <Link to="/recuperar-password" className="text-gray-500 hover:text-black transition">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
 
             <motion.button
@@ -191,6 +191,12 @@ function Login() {
                 'Ingresar'
               )}
             </motion.button>
+
+            <div className="flex justify-center text-sm mt-4">
+              <Link to="/admision-online" className="text-gray-500 hover:text-black transition">
+                ¿Eres nuevo estudiante? <span className="font-bold underline underline-offset-2">Regístrate aquí</span>
+              </Link>
+            </div>
           </form>
         </div>
       </div>
