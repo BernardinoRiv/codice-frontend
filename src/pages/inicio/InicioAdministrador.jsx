@@ -42,11 +42,45 @@ export default function InicioAdministrador() {
   const [datosKpi, setDatosKpi] = useState(null);
   const [carreraSeleccionada, setCarreraSeleccionada] = useState(null);
 
+  const [datosSecciones, setDatosSecciones] = useState(null);
+  const [cargandoSecciones, setCargandoSecciones] = useState(false);
+  const [errorSecciones, setErrorSecciones] = useState('');
+  const [jornadaSeleccionada, setJornadaSeleccionada] = useState('TODAS');
+  const [carreraSeccionSeleccionada, setCarreraSeccionSeleccionada] = useState(null);
+  const [materiaSeccionSeleccionada, setMateriaSeccionSeleccionada] = useState(null);
+  const [paginaSecciones, setPaginaSecciones] = useState(1);
+
   const [datosDocentes, setDatosDocentes] = useState(null);
   const [cargandoDocentes, setCargandoDocentes] = useState(false);
   const [errorDocentes, setErrorDocentes] = useState('');
   const [carreraDocenteSeleccionada, setCarreraDocenteSeleccionada] = useState(null);
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
+
+  useEffect(() => {
+    if (kpiActivo !== 'secciones' || !cicloSeleccionado) return;
+    let vigente = true;
+    setCargandoSecciones(true);
+    setErrorSecciones('');
+    setDatosSecciones(null);
+    setJornadaSeleccionada('TODAS');
+    setMateriaSeccionSeleccionada(null);
+    setPaginaSecciones(1);
+    dashboardService.obtenerMetricasSecciones(cicloSeleccionado, sedeSeleccionada)
+      .then(data => {
+        if (!vigente) return;
+        setDatosSecciones(data);
+        setCarreraSeccionSeleccionada(prev =>
+          (data.gruposPorCarrera ?? []).some(c => c.idCarrera === prev)
+            ? prev : (data.gruposPorCarrera?.[0]?.idCarrera ?? null)
+        );
+      })
+      .catch(err => {
+        if (!vigente) return;
+        setErrorSecciones(err.message || 'No fue posible cargar las secciones.');
+      })
+      .finally(() => { if (vigente) setCargandoSecciones(false); });
+    return () => { vigente = false; };
+  }, [kpiActivo, cicloSeleccionado, sedeSeleccionada]);
 
   // Consultar docentes únicamente al abrir la sección o cambiar los filtros.
   useEffect(() => {
@@ -198,6 +232,22 @@ export default function InicioAdministrador() {
     ? docentesDetalle.reduce((total, docente) => total + Number(docente.cantidadMaterias ?? 0), 0) / docentesDetalle.length
     : 0;
 
+  const detalleSecciones = datosSecciones?.detalleGrupos ?? [];
+  const carrerasSecciones = datosSecciones?.gruposPorCarrera ?? [];
+  const carreraSeccionActiva = carrerasSecciones.find(c => c.idCarrera === carreraSeccionSeleccionada);
+  const materiasSeccion = carreraSeccionActiva?.materias ?? [];
+  const jornadasSecciones = datosSecciones?.distribucionJornadas ?? [];
+  const cantidadJornada = nombre => Number(jornadasSecciones.find(j => j.nombre === nombre)?.cantidad ?? 0);
+  const totalJornadas = jornadasSecciones.reduce((n, j) => n + Number(j.cantidad ?? 0), 0);
+  const detalleFiltrado = detalleSecciones.filter(g =>
+    (jornadaSeleccionada === 'TODAS' || g.jornada === jornadaSeleccionada) &&
+    (materiaSeccionSeleccionada === null || g.idMateria === materiaSeccionSeleccionada)
+  );
+  const tamanioPagina = 8;
+  const totalPaginas = Math.max(1, Math.ceil(detalleFiltrado.length / tamanioPagina));
+  const detallePaginado = detalleFiltrado.slice((Math.min(paginaSecciones, totalPaginas) - 1) * tamanioPagina, Math.min(paginaSecciones, totalPaginas) * tamanioPagina);
+  const porcentaje = n => totalJornadas ? (Number(n) * 100 / totalJornadas) : 0;
+
   if (cargando && !datosKpi) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center">
@@ -339,11 +389,11 @@ export default function InicioAdministrador() {
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
-            {formatoNumero(datosKpi?.seccionesAbiertas)}
+            {formatoNumero(datosSecciones?.seccionesAbiertas ?? datosKpi?.seccionesAbiertas)}
           </p>
 
           <p className="text-xs font-semibold text-slate-500 mt-3">
-            Capacidad media: {Number(datosKpi?.capacidadPromedio ?? 0).toFixed(1)}%
+            Ocupación: {Number(datosSecciones?.ocupacionGlobal ?? datosKpi?.capacidadPromedio ?? 0).toFixed(1)}%
           </p>
         </div>
 
@@ -770,8 +820,126 @@ export default function InicioAdministrador() {
         </div>
       )}
 
+      {/* DETALLES DE SECCIONES */}
+      {kpiActivo === 'secciones' && (
+        <div className="space-y-6">
+          {cargandoSecciones && <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500">Cargando secciones abiertas...</div>}
+          {errorSecciones && <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">{errorSecciones}</div>}
+          {!cargandoSecciones && !errorSecciones && datosSecciones && <>
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[
+                ['Secciones abiertas', datosSecciones.seccionesAbiertas, 'Grupos habilitados'],
+                ['Ocupación global', `${Number(datosSecciones.ocupacionGlobal ?? 0).toFixed(1)}%`, `${formatoNumero(datosSecciones.inscritos)} de ${formatoNumero(datosSecciones.cuposTotales)} cupos`],
+                ['Cupos disponibles', datosSecciones.cuposDisponibles, 'Plazas restantes']
+              ].map(([titulo, valor, subtitulo]) => <div key={titulo} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{titulo}</p>
+                <p className="text-4xl font-black text-slate-900 mt-3">{typeof valor === 'number' ? formatoNumero(valor) : valor}</p>
+                <p className="text-sm text-slate-500 mt-2">{subtitulo}</p>
+              </div>)}
+            </section>
+
+            <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
+                <div><h3 className="text-lg font-bold text-slate-900">Secciones por jornada</h3>
+                <p className="text-sm text-slate-500">Según hora de inicio. Selecciona una jornada para filtrar el detalle.</p></div>
+                {jornadaSeleccionada !== 'TODAS' && <button type="button" className="text-sm text-blue-700 font-semibold hover:underline" onClick={() => {setJornadaSeleccionada('TODAS');setPaginaSecciones(1);}}>Ver todas</button>}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                {[
+                  {nombre:'DIURNA', titulo:'Diurna', icono:'☀', color:'#2563eb', activo:'border-blue-400 bg-blue-50'},
+                  {nombre:'NOCTURNA', titulo:'Nocturna', icono:'☾', color:'#7c3aed', activo:'border-violet-400 bg-violet-50'}
+                ].map(j => <button key={j.nombre} type="button" aria-pressed={jornadaSeleccionada === j.nombre}
+                  onClick={() => {setJornadaSeleccionada(prev => prev === j.nombre ? 'TODAS' : j.nombre);setPaginaSecciones(1);}}
+                  className={`text-left border rounded-xl p-4 transition-colors ${jornadaSeleccionada === j.nombre ? j.activo : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
+                  <div className="text-sm font-bold text-slate-700"><span style={{color:j.color}} className="text-lg mr-2">{j.icono}</span>{j.titulo}</div>
+                  <p className="text-3xl font-black text-slate-900 mt-2">{formatoNumero(cantidadJornada(j.nombre))}</p>
+                  <p className="text-xs text-slate-500 mt-1">{porcentaje(cantidadJornada(j.nombre)).toFixed(2)}% del total</p>
+                </button>)}
+              </div>
+              <div className="h-3.5 w-full rounded-full bg-slate-100 overflow-hidden flex" aria-label="Distribución proporcional de jornadas">
+                {[['DIURNA','#2563eb'],['NOCTURNA','#7c3aed'],['MIXTA','#f59e0b'],['SIN HORARIO','#94a3b8']].map(([nombre,color]) =>
+                  <div key={nombre} style={{width:`${porcentaje(cantidadJornada(nombre))}%`,backgroundColor:color}} title={`${nombre}: ${cantidadJornada(nombre)}`} />)}
+              </div>
+              {(cantidadJornada('MIXTA') > 0 || cantidadJornada('SIN HORARIO') > 0) && <p className="text-xs text-slate-500 mt-3">Mixtas: {cantidadJornada('MIXTA')} · Sin horario: {cantidadJornada('SIN HORARIO')}</p>}
+            </section>
+
+            <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900">Evolución histórica de secciones</h3>
+              <p className="text-sm text-slate-500 mb-5">Grupos actualmente abiertos por ciclo, hasta el ciclo seleccionado.</p>
+              {(datosSecciones.historicoSecciones ?? []).length ? <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%"><LineChart data={datosSecciones.historicoSecciones} margin={{top:10,right:20,left:0,bottom:5}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="codigoCiclo" tick={{fontSize:12}}/><YAxis allowDecimals={false} tick={{fontSize:12}}/>
+                  <Tooltip/><Line type="monotone" dataKey="cantidad" name="Secciones abiertas" stroke="#2563eb" strokeWidth={3} dot={{r:4}} activeDot={{r:6}} />
+                </LineChart></ResponsiveContainer>
+              </div> : <p className="text-sm text-slate-500">Sin datos históricos.</p>}
+            </section>
+
+            <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Estado de ocupación</h3>
+              <p className="text-sm text-slate-500 mb-5">Incluye secciones sin estudiantes inscritos.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  ['Llenos', datosSecciones.estadoOcupacion?.llenos, '#dc2626','Sin cupos'],
+                  ['Disponibles', datosSecciones.estadoOcupacion?.disponibles, '#059669','Con inscritos y cupos'],
+                  ['Vacíos', datosSecciones.estadoOcupacion?.vacios, '#64748b','Sin inscritos']
+                ].map(([nombre,cantidad,color,descripcion]) => <div key={nombre} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:color}}/>{nombre}</p>
+                  <p className="text-3xl font-black text-slate-900 mt-2">{formatoNumero(cantidad ?? 0)}</p><p className="text-xs text-slate-500 mt-1">{descripcion}</p>
+                </div>)}
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900">Grupos por carrera</h3>
+                <p className="text-sm text-slate-500 mb-5">Carreras identificadas mediante inscripciones confirmadas.</p>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {carrerasSecciones.map(c => <button key={c.idCarrera} type="button" onClick={() => {setCarreraSeccionSeleccionada(c.idCarrera);setMateriaSeccionSeleccionada(null);setPaginaSecciones(1);}}
+                    className={`w-full text-left flex justify-between items-center gap-3 p-3 rounded-xl border ${carreraSeccionSeleccionada === c.idCarrera ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                    <span className="text-sm font-semibold text-slate-800">{c.nombre}</span><span className="text-xs font-bold text-blue-700 shrink-0">{c.cantidadGrupos} grupos</span>
+                  </button>)}
+                  {!carrerasSecciones.length && <p className="text-sm text-slate-500">Sin carreras vinculadas por inscripciones.</p>}
+                </div>
+              </section>
+              <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900">Materias y grupos</h3>
+                <p className="text-sm text-slate-500 mb-5">{carreraSeccionActiva ? `Materias de ${carreraSeccionActiva.nombre}.` : 'Selecciona una carrera.'}</p>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {materiasSeccion.map(m => <button key={m.idMateria} type="button" onClick={() => {setMateriaSeccionSeleccionada(prev => prev === m.idMateria ? null : m.idMateria);setPaginaSecciones(1);}}
+                    className={`w-full text-left flex justify-between items-center gap-3 p-3 rounded-xl border ${materiaSeccionSeleccionada === m.idMateria ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                    <span className="text-sm font-semibold text-slate-800">{m.nombre}</span><span className="text-xs font-bold text-blue-700 shrink-0">{m.cantidadGrupos} grupos</span>
+                  </button>)}
+                  {!materiasSeccion.length && <p className="text-sm text-slate-500">Sin materias asociadas.</p>}
+                </div>
+              </section>
+            </div>
+
+            <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div><h3 className="text-lg font-bold text-slate-900">Detalle de secciones</h3>
+                  <p className="text-sm text-slate-500">Todos los grupos abiertos, incluidos los vacíos. {detalleFiltrado.length} resultados.</p></div>
+                {(materiaSeccionSeleccionada !== null || jornadaSeleccionada !== 'TODAS') && <button type="button" className="text-sm font-semibold text-blue-700 hover:underline" onClick={() => {setMateriaSeccionSeleccionada(null);setJornadaSeleccionada('TODAS');setPaginaSecciones(1);}}>Limpiar filtros</button>}
+              </div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm text-left">
+                <thead className="bg-slate-50 text-slate-600 text-xs uppercase"><tr>{['Grupo','Materia','Docente','Jornada','Inscritos','Cupo','Ocupación'].map(t => <th key={t} className="px-3 py-3 font-bold">{t}</th>)}</tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {detallePaginado.map(g => <tr key={g.idGrupo} className="hover:bg-slate-50">
+                    <td className="px-3 py-3 font-semibold text-slate-800">{g.codigoGrupo}</td><td className="px-3 py-3 text-slate-700">{g.materia}</td><td className="px-3 py-3 text-slate-600">{g.docente || 'Sin asignar'}</td>
+                    <td className="px-3 py-3"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${g.jornada === 'DIURNA' ? 'bg-blue-50 text-blue-700' : g.jornada === 'NOCTURNA' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-700'}`}>{g.jornada}</span></td>
+                    <td className="px-3 py-3">{g.inscritos}</td><td className="px-3 py-3">{g.cupoMaximo}</td>
+                    <td className="px-3 py-3"><div className="flex items-center gap-2"><div className="h-2 w-16 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:`${Math.min(100,Math.max(0,Number(g.porcentajeOcupacion ?? 0)))}%`}} /></div><span>{Number(g.porcentajeOcupacion ?? 0).toFixed(1)}%</span></div></td>
+                  </tr>)}
+                  {!detallePaginado.length && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-500">No hay grupos para los filtros seleccionados.</td></tr>}
+                </tbody>
+              </table></div>
+              {totalPaginas > 1 && <div className="flex items-center justify-end gap-3 mt-4"><button type="button" disabled={paginaSecciones <= 1} onClick={() => setPaginaSecciones(p => Math.max(1,p-1))} className="text-sm font-semibold text-blue-700 disabled:text-slate-300">Anterior</button><span className="text-xs text-slate-500">{Math.min(paginaSecciones,totalPaginas)} / {totalPaginas}</span><button type="button" disabled={paginaSecciones >= totalPaginas} onClick={() => setPaginaSecciones(p => Math.min(totalPaginas,p+1))} className="text-sm font-semibold text-blue-700 disabled:text-slate-300">Siguiente</button></div>}
+            </section>
+          </>}
+        </div>
+      )}
+
       {/* MÓDULOS PENDIENTES */}
-      {kpiActivo !== 'matricula' && kpiActivo !== 'docentes' && (
+      {kpiActivo !== 'matricula' && kpiActivo !== 'docentes' && kpiActivo !== 'secciones' && (
         <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
           <p className="text-slate-500 font-medium">
             Visualización detallada para{' '}
