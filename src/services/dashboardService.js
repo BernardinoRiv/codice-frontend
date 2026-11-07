@@ -32,6 +32,23 @@ export const dashboardService = {
     return await response.json();
   },
 
+  // Métricas específicas de docentes por ciclo y sede
+  obtenerMetricasDocentes: async (codigoCiclo, idSede) => {
+    const params = new URLSearchParams();
+    if (codigoCiclo) params.append('codigoCiclo', codigoCiclo);
+    if (idSede !== null && idSede !== undefined && idSede !== '') {
+      params.append('idSede', String(idSede));
+    }
+    const response = await apiInterceptor(
+      `/api/v1/dashboard/metricas/docentes?${params.toString()}`
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.mensaje || errorData.message || 'Error al obtener las métricas de docentes');
+    }
+    return await response.json();
+  },
+
   // Obtener catálogo de ciclos académicos
   obtenerCiclosDisponibles: async () => {
     const response = await apiInterceptor('/api/v1/ciclos');

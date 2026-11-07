@@ -34,7 +34,6 @@ import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 
 // Nueva vista dashboard
-import InicioGerencia from './pages/inicio/inicioGerencia';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
 const normalizarRol = (rol = '') => {
@@ -282,11 +281,6 @@ function App() {
             </RutaPorRol>
           } />
 
-          <Route path="gerencia" element={
-            <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'DIRECTOR_REGIONAL']}>
-              <InicioGerencia />
-            </RutaPorRol>
-          } />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

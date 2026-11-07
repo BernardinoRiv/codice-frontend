@@ -42,6 +42,41 @@ export default function InicioAdministrador() {
   const [datosKpi, setDatosKpi] = useState(null);
   const [carreraSeleccionada, setCarreraSeleccionada] = useState(null);
 
+  const [datosDocentes, setDatosDocentes] = useState(null);
+  const [cargandoDocentes, setCargandoDocentes] = useState(false);
+  const [errorDocentes, setErrorDocentes] = useState('');
+  const [carreraDocenteSeleccionada, setCarreraDocenteSeleccionada] = useState(null);
+  const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
+
+  // Consultar docentes únicamente al abrir la sección o cambiar los filtros.
+  useEffect(() => {
+    if (kpiActivo !== 'docentes' || !cicloSeleccionado) return;
+    let vigente = true;
+    setCargandoDocentes(true);
+    setErrorDocentes('');
+    setDatosDocentes(null);
+    dashboardService.obtenerMetricasDocentes(cicloSeleccionado, sedeSeleccionada)
+      .then(data => {
+        if (!vigente) return;
+        setDatosDocentes(data);
+        setCarreraDocenteSeleccionada(anterior =>
+          (data.docentesPorCarrera ?? []).some(c => c.idCarrera === anterior)
+            ? anterior : (data.docentesPorCarrera?.[0]?.idCarrera ?? null)
+        );
+        setDocenteSeleccionado(anterior =>
+          (data.detalleDocentes ?? []).some(d => d.idDocente === anterior)
+            ? anterior : (data.detalleDocentes?.[0]?.idDocente ?? null)
+        );
+      })
+      .catch(err => {
+        if (!vigente) return;
+        console.error('Error al obtener métricas docentes:', err);
+        setErrorDocentes(err.message || 'No fue posible cargar las métricas de docentes.');
+      })
+      .finally(() => { if (vigente) setCargandoDocentes(false); });
+    return () => { vigente = false; };
+  }, [kpiActivo, cicloSeleccionado, sedeSeleccionada]);
+
   // Cargar catálogos
   useEffect(() => {
     const cargarCatalogos = async () => {
@@ -141,6 +176,27 @@ export default function InicioAdministrador() {
     carrera => carrera.idCarrera === carreraSeleccionada
   );
   const materiasCarrera = carreraActiva?.materias ?? [];
+
+  const carrerasDocentes = datosDocentes?.docentesPorCarrera ?? [];
+  const carreraDocenteActiva = carrerasDocentes.find(c => c.idCarrera === carreraDocenteSeleccionada);
+  const docentesCarrera = carreraDocenteActiva?.docentes ?? [];
+  const docentesDetalle = datosDocentes?.detalleDocentes ?? [];
+  const docenteActivoDetalle = docentesDetalle.find(d => d.idDocente === docenteSeleccionado);
+  const contratosDocentes = datosDocentes?.distribucionContratos ?? [];
+  const totalDocentes = datosDocentes?.docentesActivos ?? 0;
+  // Las materias se cuentan una sola vez aunque las impartan varios docentes.
+  const materiasDistintas = new Set(
+    docentesDetalle.flatMap(docente => (docente.materias ?? []).map(materia => materia.idMateria))
+  ).size;
+  // Los grupos sí se suman por asignación docente y materia.
+  const gruposAsignados = docentesDetalle.reduce(
+    (total, docente) => total + (docente.materias ?? []).reduce(
+      (subtotal, materia) => subtotal + Number(materia.cantidadGrupos ?? 0), 0
+    ), 0
+  );
+  const promedioMateriasDocente = docentesDetalle.length > 0
+    ? docentesDetalle.reduce((total, docente) => total + Number(docente.cantidadMaterias ?? 0), 0) / docentesDetalle.length
+    : 0;
 
   if (cargando && !datosKpi) {
     return (
@@ -243,7 +299,7 @@ export default function InicioAdministrador() {
           </p>
 
           <p className="text-xs font-bold text-emerald-700 mt-3 bg-emerald-50 inline-block px-2.5 py-1 rounded-lg">
-            Matrículas confirmadas
+            Estudiantes matriculados
           </p>
         </div>
 
@@ -261,7 +317,7 @@ export default function InicioAdministrador() {
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
-            {formatoNumero(datosKpi?.docentesActivos)}
+            {formatoNumero(datosDocentes?.docentesActivos ?? datosKpi?.docentesActivos)}
           </p>
 
           <p className="text-xs font-semibold text-slate-500 mt-3">
@@ -551,8 +607,171 @@ export default function InicioAdministrador() {
         </div>
       )}
 
+      {/* DETALLES DE DOCENTES */}
+      {kpiActivo === 'docentes' && (
+        <div className="space-y-6">
+          {cargandoDocentes && (
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500">
+              Cargando información de docentes...
+            </div>
+          )}
+          {errorDocentes && (
+            <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm" role="alert">
+              {errorDocentes}
+            </div>
+          )}
+          {!cargandoDocentes && !errorDocentes && datosDocentes && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Docentes activos del ciclo</h3>
+                  <p className="text-sm text-slate-500 mb-5">Docentes distintos asignados a grupos abiertos.</p>
+                  {contratosDocentes.length > 0 ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <div className="h-[220px] w-[220px] relative shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={contratosDocentes} innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="cantidad" nameKey="nombre" stroke="none">
+                              {contratosDocentes.map((item, index) => (
+                                <Cell key={item.nombre} fill={COLORES_FACULTAD[index % COLORES_FACULTAD.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={valor => formatoNumero(valor)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="text-3xl font-black text-slate-900">{formatoNumero(totalDocentes)}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Docentes</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-3 w-full">
+                        {contratosDocentes.map((item, index) => (
+                          <div key={item.nombre} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="flex items-center gap-2 text-slate-600 font-medium">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORES_FACULTAD[index % COLORES_FACULTAD.length] }} />
+                              {item.nombre}
+                            </span>
+                            <span className="font-bold text-slate-900">{formatoNumero(item.cantidad)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : <p className="text-sm text-slate-400 py-8 text-center">Sin docentes asignados en este ciclo y sede.</p>}
+                </section>
+                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Carga académica docente</h3>
+                  <p className="text-sm text-slate-500 mb-5">Asignaciones de los docentes en el ciclo y sede seleccionados.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="rounded-xl bg-blue-50 border border-blue-100 p-5">
+                      <p className="text-sm font-semibold text-slate-600">Materias distintas impartidas</p>
+                      <p className="text-3xl font-black text-blue-800 mt-3">{formatoNumero(materiasDistintas)}</p>
+                      <p className="text-xs text-slate-500 mt-2">Cada materia se cuenta una sola vez.</p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-5">
+                      <p className="text-sm font-semibold text-slate-600">Grupos asignados</p>
+                      <p className="text-3xl font-black text-emerald-800 mt-3">{formatoNumero(gruposAsignados)}</p>
+                      <p className="text-xs text-slate-500 mt-2">Total de grupos impartidos.</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-4 flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-slate-600">Promedio de materias por docente</span>
+                    <span className="text-xl font-black text-slate-900">{promedioMateriasDocente.toFixed(1)}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-4">La carga incluye grupos abiertos, incluso sin estudiantes inscritos.</p>
+                </section>
+              </div>
+
+              <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Evolución histórica de docentes</h3>
+                <p className="text-sm text-slate-500 mb-6">Docentes asignados por ciclo y tipo de contratación en la sede seleccionada.</p>
+                {(datosDocentes.historicoDocentes ?? []).length > 0 ? (
+                  <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={datosDocentes.historicoDocentes} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="codigoCiclo" tick={{ fontSize: 12 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                        <Tooltip formatter={valor => formatoNumero(valor)} />
+                        <Line type="monotone" dataKey="porHoras" name="POR HORAS" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="tiempoCompleto" name="TIEMPO COMPLETO" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : <p className="text-sm text-slate-400 py-8 text-center">No hay información histórica disponible.</p>}
+              </section>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Docentes por Carrera</h3>
+                  <p className="text-sm text-slate-500 mb-5">Carreras atendidas según inscripciones activas. Selecciona una carrera.</p>
+                  {carrerasDocentes.length > 0 ? <div className="space-y-3">
+                    {carrerasDocentes.map(carrera => (
+                      <button type="button" key={carrera.idCarrera} aria-pressed={carrera.idCarrera === carreraDocenteSeleccionada}
+                        onClick={() => setCarreraDocenteSeleccionada(carrera.idCarrera)}
+                        className={`w-full flex justify-between items-center gap-4 p-3 rounded-xl text-left transition-colors border ${carrera.idCarrera === carreraDocenteSeleccionada ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                        <span className="text-sm font-medium text-slate-700">{carrera.nombre}</span>
+                        <span className="text-sm font-bold text-blue-700 shrink-0">{formatoNumero(carrera.cantidad)} docentes</span>
+                      </button>
+                    ))}
+                  </div> : <p className="text-sm text-slate-400 py-8 text-center">No hay carreras con docentes vinculados mediante inscripciones activas.</p>}
+                </section>
+                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Docentes de la Carrera</h3>
+                  <p className="text-sm text-slate-500 mb-5">{carreraDocenteActiva ? `Docentes que atienden ${carreraDocenteActiva.nombre}.` : 'Selecciona una carrera para consultar sus docentes.'}</p>
+                  {docentesCarrera.length > 0 ? <div className="space-y-3">
+                    {docentesCarrera.map(docente => (
+                      <button type="button" key={docente.idDocente} onClick={() => setDocenteSeleccionado(docente.idDocente)}
+                        className={`w-full text-left p-3 rounded-xl border transition-colors ${docente.idDocente === docenteSeleccionado ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                        <div className="flex justify-between items-start gap-3">
+                          <span className="text-sm font-semibold text-slate-800">{docente.nombre}</span>
+                          <span className="text-sm font-bold text-blue-700 shrink-0">{formatoNumero(docente.cantidadMaterias)} materias</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">{docente.tipoContratacion}</p>
+                        <div className="mt-2 text-xs text-slate-600">{(docente.materias ?? []).map(m => m.nombre).join(' · ')}</div>
+                      </button>
+                    ))}
+                  </div> : <p className="text-sm text-slate-400 py-8 text-center">No hay docentes para la carrera seleccionada.</p>}
+                </section>
+              </div>
+
+              <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Materias asignadas por Docente</h3>
+                <p className="text-sm text-slate-500 mb-5">Selecciona un docente para consultar todas sus materias y grupos del ciclo, incluso sin inscripciones.</p>
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-6">
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {docentesDetalle.map(docente => (
+                      <button key={docente.idDocente} type="button" aria-pressed={docente.idDocente === docenteSeleccionado}
+                        onClick={() => setDocenteSeleccionado(docente.idDocente)}
+                        className={`w-full text-left p-3 rounded-xl border transition-colors ${docente.idDocente === docenteSeleccionado ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                        <div className="text-sm font-semibold text-slate-800">{docente.nombre}</div>
+                        <div className="text-xs text-slate-500 mt-1">{docente.tipoContratacion} · {formatoNumero(docente.cantidadMaterias)} materias</div>
+                      </button>
+                    ))}
+                    {docentesDetalle.length === 0 && <p className="text-sm text-slate-400">No hay docentes asignados.</p>}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 border border-slate-100">
+                    {docenteActivoDetalle ? <>
+                      <h4 className="font-bold text-slate-900">{docenteActivoDetalle.nombre}</h4>
+                      <p className="text-xs text-slate-500 mt-1 mb-4">{docenteActivoDetalle.tipoContratacion} · {formatoNumero(docenteActivoDetalle.cantidadMaterias)} materias distintas</p>
+                      <div className="space-y-2">
+                        {(docenteActivoDetalle.materias ?? []).map(materia => (
+                          <div key={materia.idMateria} className="bg-white rounded-lg border border-slate-200 p-3 flex justify-between items-center gap-3">
+                            <span className="text-sm font-medium text-slate-700">{materia.nombre}</span>
+                            <span className="text-xs font-bold text-blue-700 shrink-0">{formatoNumero(materia.cantidadGrupos)} grupos</span>
+                          </div>
+                        ))}
+                      </div>
+                    </> : <p className="text-sm text-slate-400">Selecciona un docente para consultar sus materias.</p>}
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      )}
+
       {/* MÓDULOS PENDIENTES */}
-      {kpiActivo !== 'matricula' && (
+      {kpiActivo !== 'matricula' && kpiActivo !== 'docentes' && (
         <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
           <p className="text-slate-500 font-medium">
             Visualización detallada para{' '}
