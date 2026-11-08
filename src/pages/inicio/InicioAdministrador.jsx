@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 
 import { dashboardService } from '../../services/dashboardService';
+import DashboardCobros from './DashboardCobros';
 
 const COLORES_FACULTAD = [
   '#1e40af', '#3b82f6', '#10b981', '#f59e0b'
@@ -55,6 +56,46 @@ export default function InicioAdministrador() {
   const [errorDocentes, setErrorDocentes] = useState('');
   const [carreraDocenteSeleccionada, setCarreraDocenteSeleccionada] = useState(null);
   const [docenteSeleccionado, setDocenteSeleccionado] = useState(null);
+
+  const [datosCobros, setDatosCobros] = useState(null);
+  const [cargandoCobros, setCargandoCobros] = useState(false);
+  const [errorCobros, setErrorCobros] = useState('');
+
+  
+  useEffect(() => {
+    if (kpiActivo !== 'cobros' || !cicloSeleccionado) return;
+
+    let vigente = true;
+
+    setCargandoCobros(true);
+    setErrorCobros('');
+    setDatosCobros(null);
+
+    dashboardService
+      .obtenerMetricasCobros(cicloSeleccionado, sedeSeleccionada)
+      .then(data => {
+        if (vigente) {
+          setDatosCobros(data);
+        }
+      })
+      .catch(err => {
+        if (vigente) {
+          setErrorCobros(
+            err.message || 'No fue posible cargar los cobros.'
+          );
+        }
+      })
+      .finally(() => {
+        if (vigente) {
+          setCargandoCobros(false);
+        }
+      });
+
+    return () => {
+      vigente = false;
+    };
+  }, [kpiActivo, cicloSeleccionado, sedeSeleccionada]);
+
 
   useEffect(() => {
     if (kpiActivo !== 'secciones' || !cicloSeleccionado) return;
@@ -407,7 +448,7 @@ export default function InicioAdministrador() {
           }`}
         >
           <h3 className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-3">
-            Estado de Cobros
+            {Number(datosCobros?.porcentajeCumplimiento ?? datosKpi?.porcentajeCobro ?? 0).toFixed(1)}%
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
@@ -938,8 +979,12 @@ export default function InicioAdministrador() {
         </div>
       )}
 
+      {kpiActivo === 'cobros' && (
+        <DashboardCobros datos={datosCobros} cargando={cargandoCobros} error={errorCobros} />
+      )}
+
       {/* MÓDULOS PENDIENTES */}
-      {kpiActivo !== 'matricula' && kpiActivo !== 'docentes' && kpiActivo !== 'secciones' && (
+      {kpiActivo !== 'matricula' && kpiActivo !== 'docentes' && kpiActivo !== 'secciones' && kpiActivo !== 'cobros' && (
         <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
           <p className="text-slate-500 font-medium">
             Visualización detallada para{' '}

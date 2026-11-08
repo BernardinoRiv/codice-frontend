@@ -3,7 +3,7 @@ import apiInterceptor from './apiInterceptor';
 
 export const dashboardService = {
 
-  // Obtener métricas del dashboard por ciclo y sede
+  // Métricas generales por ciclo y sede
   obtenerMetricasGerenciales: async (codigoCiclo, idSede) => {
     const params = new URLSearchParams();
 
@@ -29,41 +29,97 @@ export const dashboardService = {
       );
     }
 
-    return await response.json();
+    return response.json();
   },
 
-  // Métricas específicas de docentes por ciclo y sede
+  // Métricas de docentes
   obtenerMetricasDocentes: async (codigoCiclo, idSede) => {
     const params = new URLSearchParams();
-    if (codigoCiclo) params.append('codigoCiclo', codigoCiclo);
+
+    if (codigoCiclo) {
+      params.append('codigoCiclo', codigoCiclo);
+    }
+
     if (idSede !== null && idSede !== undefined && idSede !== '') {
       params.append('idSede', String(idSede));
     }
+
     const response = await apiInterceptor(
       `/api/v1/dashboard/metricas/docentes?${params.toString()}`
     );
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.mensaje || errorData.message || 'Error al obtener las métricas de docentes');
+
+      throw new Error(
+        errorData.mensaje ||
+        errorData.message ||
+        'Error al obtener las métricas de docentes'
+      );
     }
-    return await response.json();
+
+    return response.json();
   },
 
+  // Métricas de secciones
   obtenerMetricasSecciones: async (codigoCiclo, idSede) => {
     const params = new URLSearchParams();
-    if (codigoCiclo) params.append('codigoCiclo', codigoCiclo);
+
+    if (codigoCiclo) {
+      params.append('codigoCiclo', codigoCiclo);
+    }
+
     if (idSede !== null && idSede !== undefined && idSede !== '') {
       params.append('idSede', String(idSede));
     }
-    const response = await apiInterceptor(`/api/v1/dashboard/metricas/secciones?${params.toString()}`);
+
+    const response = await apiInterceptor(
+      `/api/v1/dashboard/metricas/secciones?${params.toString()}`
+    );
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.mensaje || errorData.message || 'Error al obtener las métricas de secciones');
+
+      throw new Error(
+        errorData.mensaje ||
+        errorData.message ||
+        'Error al obtener las métricas de secciones'
+      );
     }
-    return await response.json();
+
+    return response.json();
   },
 
-  // Obtener catálogo de ciclos académicos
+  // Las siete secciones del dashboard financiero
+  obtenerMetricasCobros: async (codigoCiclo, idSede) => {
+    const params = new URLSearchParams();
+
+    if (codigoCiclo) {
+      params.append('codigoCiclo', codigoCiclo);
+    }
+
+    if (idSede !== null && idSede !== undefined && idSede !== '') {
+      params.append('idSede', String(idSede));
+    }
+
+    const response = await apiInterceptor(
+      `/api/v1/dashboard/metricas/cobros?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      throw new Error(
+        errorData.mensaje ||
+        errorData.message ||
+        'No fue posible obtener las métricas de cobros.'
+      );
+    }
+
+    return response.json();
+  },
+
+  // Catálogo de ciclos académicos
   obtenerCiclosDisponibles: async () => {
     const response = await apiInterceptor('/api/v1/ciclos');
 
@@ -71,10 +127,10 @@ export const dashboardService = {
       throw new Error('Error al cargar el catálogo de ciclos');
     }
 
-    return await response.json();
+    return response.json();
   },
 
-  // Obtener catálogo de sedes
+  // Catálogo de sedes
   obtenerSedesDisponibles: async () => {
     const response = await apiInterceptor(
       '/api/v1/catalogos?nombres=sedes'
