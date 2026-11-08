@@ -202,6 +202,7 @@ export default function InicioAdministrador() {
     const cargarDatos = async () => {
       setCargando(true);
       setError('');
+      setDatosKpi(null);
 
       try {
         const data = await dashboardService.obtenerMetricasGerenciales(
@@ -414,7 +415,7 @@ export default function InicioAdministrador() {
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
-            {formatoNumero(datosDocentes?.docentesActivos ?? datosKpi?.docentesActivos)}
+            {formatoNumero(datosKpi?.docentesActivos)}
           </p>
 
           <p className="text-xs font-semibold text-slate-500 mt-3">
@@ -436,7 +437,7 @@ export default function InicioAdministrador() {
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
-            {formatoNumero(datosSecciones?.seccionesAbiertas ?? datosKpi?.seccionesAbiertas)}
+            {formatoNumero(datosKpi?.seccionesAbiertas)}
           </p>
 
           <p className="text-xs font-semibold text-slate-500 mt-3">
@@ -454,7 +455,7 @@ export default function InicioAdministrador() {
           }`}
         >
           <h3 className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-3">
-            {Number(datosCobros?.porcentajeCumplimiento ?? datosKpi?.porcentajeCobro ?? 0).toFixed(1)}%
+            Cobros y recaudación
           </h3>
 
           <p className="text-4xl font-black text-slate-900">
