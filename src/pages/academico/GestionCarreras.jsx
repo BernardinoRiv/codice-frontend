@@ -703,10 +703,10 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
               key={card.id}
               aria-pressed={estadoFiltro === card.id}
               onClick={() => setEstadoFiltro(card.id)}
-              className={`text-left p-6 rounded-2xl border transition-all ${activo ? "bg-slate-900 text-white border-slate-900 shadow-md" : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 shadow-sm"}`}
+              className={`text-left p-6 rounded-2xl border transition-all ${activo ? "bg-blue-50/50 text-slate-900 border-blue-500 ring-1 ring-blue-500 shadow-sm" : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 shadow-sm"}`}
             >
               <span
-                className={`block text-[11px] font-bold uppercase tracking-widest ${activo ? "text-slate-300" : "text-slate-500"}`}
+                className={`block text-[11px] font-bold uppercase tracking-widest ${activo ? "text-slate-500" : "text-slate-500"}`}
               >
                 {card.titulo}
               </span>
@@ -714,7 +714,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
                 {conteo}
               </span>
               <span
-                className={`block text-xs font-medium ${activo ? "text-slate-400" : "text-slate-500"}`}
+                className={`block text-xs font-medium ${activo ? "text-slate-500" : "text-slate-500"}`}
               >
                 {card.sub}
               </span>
