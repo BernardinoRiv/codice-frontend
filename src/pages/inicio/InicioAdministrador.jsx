@@ -63,33 +63,39 @@ export default function InicioAdministrador() {
 
   
   useEffect(() => {
-    if (kpiActivo !== 'cobros' || !cicloSeleccionado) return;
+    if (kpiActivo !== 'cobros') return;
 
     let vigente = true;
 
-    setCargandoCobros(true);
-    setErrorCobros('');
-    setDatosCobros(null);
+    const cargarCobros = async () => {
+      setCargandoCobros(true);
+      setErrorCobros(null);
+      setDatosCobros(null);
 
-    dashboardService
-      .obtenerMetricasCobros(cicloSeleccionado, sedeSeleccionada)
-      .then(data => {
+      try {
+        const respuesta =
+          await dashboardService.obtenerMetricasCobros(
+            cicloSeleccionado,
+            sedeSeleccionada
+          );
+
         if (vigente) {
-          setDatosCobros(data);
+          setDatosCobros(respuesta);
         }
-      })
-      .catch(err => {
+      } catch (error) {
         if (vigente) {
           setErrorCobros(
-            err.message || 'No fue posible cargar los cobros.'
+            error.message || 'Error al cargar los datos financieros.'
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (vigente) {
           setCargandoCobros(false);
         }
-      });
+      }
+    };
+
+    cargarCobros();
 
     return () => {
       vigente = false;
@@ -980,7 +986,12 @@ export default function InicioAdministrador() {
       )}
 
       {kpiActivo === 'cobros' && (
-        <DashboardCobros datos={datosCobros} cargando={cargandoCobros} error={errorCobros} />
+        <DashboardCobros
+          key={`cobros-${cicloSeleccionado ?? 'todos'}-${sedeSeleccionada ?? 'todas'}`}
+          datos={datosCobros}
+          cargando={cargandoCobros}
+          error={errorCobros}
+        />
       )}
 
       {/* MÓDULOS PENDIENTES */}
