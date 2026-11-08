@@ -28,7 +28,7 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
-
+import GestionCarreras from './pages/academico/GestionCarreras'; // <--- IMPORTACIÓN AÑADIDA AQUÍ
 
 // Nueva vista pública de admisión
 import AdmisionOnline from './pages/academico/AdmisionOnline';
@@ -220,6 +220,14 @@ function App() {
           } />
 
           {/* Gestión Académica y Ciclos */}
+          
+          {/* <--- RUTA DE CARRERAS AÑADIDA AQUÍ ---> */}
+          <Route path="carreras" element={
+            <RutaPorRol rolesPermitidos={['ADMINISTRADOR']}>
+              <GestionCarreras />
+            </RutaPorRol>
+          } />
+
           <Route path="oferta-academica" element={
             <RutaPorRol rolesPermitidos={['REGISTRO_ACADEMICO', 'EMPLEADO']}>
               <AperturaSeccion />
