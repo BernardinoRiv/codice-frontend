@@ -78,5 +78,24 @@ export const admisionService = {
     return await request(`/api/v1/public/admision-online/cancelar/${encodeURIComponent(idMatricula)}`, {
       method: 'DELETE'
     });
-  }
+  },
+
+  solicitarCodigoAdmision: (idTipoDocumento, numeroDocumento) =>
+  request('/api/v1/public/admision-online/solicitar-codigo', {
+    method: 'POST',
+    body: JSON.stringify({
+      idTipoDocumento: String(idTipoDocumento),
+      numeroDocumento
+    })
+  }),
+
+  verificarCodigoAdmision: (idTipoDocumento, numeroDocumento, codigo) =>
+    request('/api/v1/public/admision-online/verificar-codigo', {
+      method: 'POST',
+      body: JSON.stringify({
+        idTipoDocumento: String(idTipoDocumento),
+        numeroDocumento,
+        codigo
+      })
+    })
 };
