@@ -1,5 +1,4 @@
 const API_URL = import.meta.env.VITE_API_URL;
-
 let isRedirecting = false;
 
 const apiInterceptor = async (url, options = {}) => {
@@ -12,6 +11,7 @@ const apiInterceptor = async (url, options = {}) => {
   };
 
   try {
+    // Al usar fetch, pasará por el fetchInterceptor global automáticamente
     const response = await fetch(`${API_URL}${url}`, {
       ...options,
       headers
@@ -21,11 +21,7 @@ const apiInterceptor = async (url, options = {}) => {
       if (!isRedirecting) {
         isRedirecting = true;
         localStorage.clear();
-        
-        // Forzar redirección inmediata
         window.location.replace('/');
-        
-        // Lanzar error para detener cualquier procesamiento adicional
         throw new Error('Sesion cerrada');
       }
     }
@@ -36,14 +32,15 @@ const apiInterceptor = async (url, options = {}) => {
 
     return response;
   } catch (error) {
-    // Si es error de red o sesión, asegurar redirección
-    if (error.message === 'Sesion cerrada' || error.message === 'Failed to fetch') {
+    if (error.message === 'Sesion cerrada') {
       if (!isRedirecting) {
         isRedirecting = true;
         localStorage.clear();
         window.location.replace('/');
       }
     }
+    // NOTA: Eliminamos la regla que borraba la sesión al recibir 'Failed to fetch'.
+    // Ahora el usuario puede recargar la página (F5) sin ser expulsado.
     throw error;
   }
 };
