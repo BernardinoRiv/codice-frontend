@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { menuMaestro } from '../config/menuConfig'; 
 import apiInterceptor from '../services/apiInterceptor';
+import SessionGuard from './SessionGuard';
 
 
 function DashboardLayout() {
@@ -12,7 +13,7 @@ function DashboardLayout() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false); 
   
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -99,6 +100,7 @@ function DashboardLayout() {
 
   return (
     <div className="flex h-[100dvh] bg-slate-50 font-sans text-slate-900 overflow-hidden relative">
+      <SessionGuard />
       <AnimatePresence>
         {isMobile && isMobileOpen && (
           <motion.div
@@ -140,6 +142,7 @@ function DashboardLayout() {
 
             <button 
               onClick={handleSidebarAction}
+              aria-label={isMobile ? "Cerrar menú" : isMinimized ? "Expandir menú" : "Contraer menú"}
               disabled={isAnimating && !isMobile}
               className={`cursor-pointer text-slate-400 hover:text-slate-900 hover:bg-slate-100 flex-shrink-0 rounded-full w-8 h-8 flex items-center justify-center transition-colors ${(isAnimating && !isMobile) ? 'opacity-50' : ''}`}
             >
@@ -239,29 +242,41 @@ function DashboardLayout() {
         </div>
       </motion.aside>
 
-      <main className="flex-1 flex flex-col relative h-full overflow-hidden">
+      <main className="flex-1 min-w-0 min-h-0 flex flex-col relative h-full overflow-hidden">
         {isMobile && (
           <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-slate-200 flex-shrink-0">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 rounded-full bg-slate-900"></div>
               <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">Codice</h1>
             </div>
-            <button onClick={() => setIsMobileOpen(true)} className="text-slate-600 hover:text-slate-900 p-2 -mr-2 rounded-full bg-white hover:bg-slate-50 shadow-sm border border-slate-200 transition-all active:scale-95">
+            <button aria-label="Abrir menú" aria-expanded={isMobileOpen} onClick={() => setIsMobileOpen(true)} className="text-slate-600 hover:text-slate-900 p-2 -mr-2 rounded-full bg-white hover:bg-slate-50 shadow-sm border border-slate-200 transition-all active:scale-95">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
             </button>
           </header>
         )}
 
-        <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-4 pb-20' : 'p-8 pb-10'} [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]`}>
-           <motion.div
-             key={location.pathname}
-             initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-             transition={{ duration: 0.3, ease: "easeOut" }}
-             className="h-full max-w-[1400px] mx-auto"
-           >
-             <Outlet />
-           </motion.div>
+        {/* Un solo scroll para el contenido y el footer. */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="min-h-full flex flex-col px-4 pt-5 md:px-8 md:pt-8">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="w-full max-w-[1400px] mx-auto flex-1 min-w-0"
+            >
+              <Outlet />
+            </motion.div>
+
+            <footer className="w-full max-w-[1400px] mx-auto mt-8 shrink-0 border-t border-slate-200 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              <p className="text-center text-xs leading-relaxed text-slate-500">
+                © {new Date().getFullYear()}{' '}
+                <span className="font-semibold text-slate-600">Codice</span>
+                <span className="hidden sm:inline"> — </span>
+                <span className="block sm:inline">Portal Académico Institucional</span>
+              </p>
+            </footer>
+          </div>
         </div>
       </main>
 
