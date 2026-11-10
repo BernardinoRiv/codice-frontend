@@ -1,101 +1,202 @@
-const RAW_API_URL = import.meta.env.VITE_API_URL || '';
-const API_URL = RAW_API_URL.replace(/\/+$/, '');
+const RAW_API_URL = import.meta.env.VITE_API_URL || "";
+const API_URL = RAW_API_URL.trim().replace(/\/+$/, "");
 
-async function request(endpoint, options = {}) {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${API_URL}${cleanEndpoint}`;
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  };
-
-  const response = await fetch(url, { ...options, headers });
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const errorMsg = data?.detalles 
-      ? Object.values(data.detalles).join(' ') 
-      : (data?.mensaje || data?.error || `Error HTTP ${response.status}`);
-    const err = new Error(errorMsg);
-    err.status = response.status;
-    err.data = data;
-    throw err;
+export class AdmisionError extends Error {
+  constructor(message, { status = 0, data = null, kind = "http" } = {}) {
+    super(message);
+    this.name = "AdmisionError";
+    this.status = status;
+    this.data = data;
+    this.kind = kind;
   }
-  return data;
 }
-
+function mensajeError(data, status) {
+  if (data?.detalles && typeof data.detalles === "object") {
+    const values = Object.values(data.detalles)
+      .flat()
+      .filter((v) => typeof v === "string");
+    if (values.length) return values.join(" ");
+  }
+  return (
+    [data?.mensaje, data?.message, data?.error].find(
+      (x) => typeof x === "string" && x.trim(),
+    ) || `No se pudo completar la solicitud (HTTP ${status}).`
+  );
+}
+export async function request(endpoint, options = {}) {
+  if (!API_URL)
+    throw new AdmisionError(
+      "Falta configurar VITE_API_URL. Contacta al administrador.",
+      { kind: "configuration" },
+    );
+  let base;
+  try {
+    base = new URL(API_URL);
+  } catch {
+    throw new AdmisionError(
+      "La dirección de la API no está configurada correctamente.",
+      { kind: "configuration" },
+    );
+  }
+  if (
+    !["https:", "http:"].includes(base.protocol) ||
+    (globalThis.location?.protocol === "https:" && base.protocol !== "https:")
+  ) {
+    throw new AdmisionError(
+      "La conexión con la API debe usar una dirección HTTP(S) compatible con el portal.",
+      { kind: "configuration" },
+    );
+  }
+  const { timeoutMs = 25000, signal: externalSignal, ...init } = options;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  externalSignal?.addEventListener("abort", abort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  try {
+    const headers = new Headers(init.headers);
+    headers.set("Accept", "application/json");
+    if (init.body != null) headers.set("Content-Type", "application/json");
+    // Estas operaciones son públicas. El interceptor previamente compartido conserva
+    // fetch nativo aquí: no adjuntamos la sesión privada a admisiones ni la cerramos.
+    const fetchPublico =
+      globalThis.window?.[Symbol.for("codice.fetchInterceptor")]
+        ?.originalFetch || globalThis.fetch.bind(globalThis);
+    const response = await fetchPublico(
+      `${API_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`,
+      {
+        ...init,
+        headers,
+        signal: controller.signal,
+        credentials: "omit",
+        cache: "no-store",
+      },
+    );
+    const raw = response.status === 204 ? "" : await response.text();
+    let data = null;
+    if (raw.trim()) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        /* Clasificado abajo sin mostrar HTML. */
+      }
+    }
+    if (!response.ok)
+      throw new AdmisionError(mensajeError(data, response.status), {
+        status: response.status,
+        data,
+      });
+    if (
+      response.status !== 204 &&
+      (data === null || typeof data !== "object")
+    ) {
+      throw new AdmisionError(
+        "El servidor devolvió una respuesta incompleta. No repitas una reserva o pago sin comprobar su resultado.",
+        { status: response.status, kind: "invalid-response" },
+      );
+    }
+    return data;
+  } catch (error) {
+    if (externalSignal?.aborted)
+      throw new DOMException("Consulta cancelada", "AbortError");
+    if (error instanceof AdmisionError) throw error;
+    throw new AdmisionError(
+      timedOut
+        ? "El servidor tardó demasiado en responder. El resultado de la operación puede estar pendiente."
+        : "No se pudo contactar con el servidor. Revisa tu conexión.",
+      { kind: timedOut ? "timeout" : "network" },
+    );
+  } finally {
+    clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", abort);
+  }
+}
+const query = (values) =>
+  new URLSearchParams(
+    Object.entries(values).map(([k, v]) => [k, String(v)]),
+  ).toString();
 export const admisionService = {
-  // 1. Catálogos públicos y oferta académica
-  getCatalogos: async () => request('/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras'),
-  getDistritos: async (idDepartamento) => request(`/api/v1/catalogos/distritos?padreId=${idDepartamento}`),
-  getPensumVigente: async (idCarreraSede) => request(`/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${encodeURIComponent(idCarreraSede)}`),
-  getOfertaNuevoIngreso: async (idPensum, idSede) => request(`/api/v1/oferta-academica/nuevo-ingreso?idPensum=${encodeURIComponent(idPensum)}&idSede=${encodeURIComponent(idSede)}`),
-
-  // 2. Fail-Fast en Paso 1: Valida restricciones institucionales
-  verificarIdentidad: async (idTipoDocumento = 1, numeroDocumento) => {
-    const params = new URLSearchParams({ idTipoDocumento: String(idTipoDocumento), numeroDocumento: numeroDocumento.trim() });
-    return await request(`/api/v1/public/admision-online/verificar-identidad?${params.toString()}`);
-  },
-
-  // 3. Fase 1: Reserva de cupos (Ya no envía modalidadPago)
-  procesarPreMatricula: async (payload) => {
-    return await request('/api/v1/public/admision-online/pre-matricular', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
-
-  // 4. Fase 1.5: Desacoplamiento NPE (Ejecutado solo si elige Ventanilla)
-  generarBoletaNpe: async (idMatricula) => {
-    return await request(`/api/v1/public/admision-online/${encodeURIComponent(idMatricula)}/generar-boleta-npe`, {
-      method: 'POST'
-    });
-  },
-
-  // 5. Fase 2: Liquidación Online Segura (Idempotente)
-  liquidarPagoOnline: async (payloadPago, idempotencyKey) => {
-    const key = idempotencyKey || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `IDEMP-${Date.now()}`);
-    return await request('/api/v1/public/admision-online/pagar-orden', {
-      method: 'POST',
-      headers: { 'Idempotency-Key': key },
-      body: JSON.stringify({
-        idMatricula: Number(payloadPago.idMatricula),
-        cuotasAPagar: Number(payloadPago.cuotasAPagar || 1),
-        numeroTarjeta: String(payloadPago.numeroTarjeta).replace(/\s+/g, ''),
-        
-        // CORRECCIÓN DE CONTRATO AQUÍ: El DTO de Java espera "titularTarjeta", no "titular"
-        titularTarjeta: String(payloadPago.titular).trim().toUpperCase(),
-        
-        fechaExpiracion: String(payloadPago.fechaExpiracion).trim(),
-        cvv: String(payloadPago.cvv).trim()
-      })
-    });
-  },
-
-  // 6. Rollback Explícito: Requerido para el botón "Atrás" del Paso 3
-  cancelarPreMatricula: async (idMatricula) => {
-    return await request(`/api/v1/public/admision-online/cancelar/${encodeURIComponent(idMatricula)}`, {
-      method: 'DELETE'
-    });
-  },
-
+  getCatalogos: (options) =>
+    request(
+      "/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras",
+      options,
+    ),
+  getDistritos: (idDepartamento, options) =>
+    request(
+      `/api/v1/catalogos/distritos?${query({ padreId: idDepartamento })}`,
+      options,
+    ),
+  // El catálogo carreras debe entregar IDs de carrera_sede, como espera la vista original.
+  // Si entrega idCarrera, el backend debe proporcionar la relación; nunca se inventa.
+  getPensumVigente: (idCarreraSede, options) =>
+    request(
+      `/api/v1/oferta-academica/pensum-vigente?${query({ idCarreraSede })}`,
+      options,
+    ),
+  getOfertaNuevoIngreso: (idPensum, idSede, options) =>
+    request(
+      `/api/v1/oferta-academica/nuevo-ingreso?${query({ idPensum, idSede })}`,
+      options,
+    ),
+  verificarIdentidad: (idTipoDocumento, numeroDocumento, options) =>
+    request(
+      `/api/v1/public/admision-online/verificar-identidad?${query({ idTipoDocumento, numeroDocumento: numeroDocumento.trim() })}`,
+      options,
+    ),
   solicitarCodigoAdmision: (idTipoDocumento, numeroDocumento) =>
-  request('/api/v1/public/admision-online/solicitar-codigo', {
-    method: 'POST',
-    body: JSON.stringify({
-      idTipoDocumento: String(idTipoDocumento),
-      numeroDocumento
-    })
-  }),
-
-  verificarCodigoAdmision: (idTipoDocumento, numeroDocumento, codigo) =>
-    request('/api/v1/public/admision-online/verificar-codigo', {
-      method: 'POST',
+    request("/api/v1/public/admision-online/solicitar-codigo", {
+      method: "POST",
       body: JSON.stringify({
         idTipoDocumento: String(idTipoDocumento),
-        numeroDocumento,
-        codigo
-      })
-    })
+        numeroDocumento: numeroDocumento.trim(),
+      }),
+    }),
+  verificarCodigoAdmision: (idTipoDocumento, numeroDocumento, codigo) =>
+    request("/api/v1/public/admision-online/verificar-codigo", {
+      method: "POST",
+      body: JSON.stringify({
+        idTipoDocumento: String(idTipoDocumento),
+        numeroDocumento: numeroDocumento.trim(),
+        codigo,
+      }),
+    }),
+  procesarPreMatricula: (payload) =>
+    request("/api/v1/public/admision-online/pre-matricular", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      timeoutMs: 45000,
+    }),
+  generarBoletaNpe: (id) =>
+    request(
+      `/api/v1/public/admision-online/${encodeURIComponent(id)}/generar-boleta-npe`,
+      { method: "POST", timeoutMs: 45000 },
+    ),
+  cancelarPreMatricula: (id) =>
+    request(
+      `/api/v1/public/admision-online/cancelar/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    ),
+  liquidarPagoOnline: (payload, key) => {
+    if (!key)
+      throw new AdmisionError("No se pudo identificar el intento de pago.", {
+        kind: "configuration",
+      });
+    return request("/api/v1/public/admision-online/pagar-orden", {
+      method: "POST",
+      timeoutMs: 45000,
+      headers: { "Idempotency-Key": key },
+      body: JSON.stringify({
+        idMatricula: Number(payload.idMatricula),
+        cuotasAPagar: Number(payload.cuotasAPagar ?? 1),
+        numeroTarjeta: String(payload.numeroTarjeta).replace(/\s/g, ""),
+        titularTarjeta: String(payload.titular).trim().toUpperCase(),
+        fechaExpiracion: String(payload.fechaExpiracion).trim(),
+        cvv: String(payload.cvv).trim(),
+      }),
+    });
+  },
 };
