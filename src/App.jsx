@@ -28,6 +28,7 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
+import Facturas from './pages/finanzas/Facturas';
 
 
 // Nueva vista pública de admisión
@@ -279,6 +280,12 @@ function App() {
           <Route path="aranceles" element={
             <RutaPorRol rolesPermitidos={['FINANZAS', 'ADMINISTRADOR']}>
               <CatalogoAranceles />
+            </RutaPorRol>
+          } />
+          {/* NUEVA RUTA DE FACTURAS */}
+          <Route path="facturas" element={
+            <RutaPorRol rolesPermitidos={['FINANZAS', 'ADMINISTRADOR']}>
+              <Facturas />
             </RutaPorRol>
           } />
 
