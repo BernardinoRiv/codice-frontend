@@ -96,12 +96,12 @@ const EscanearAsistencia = () => {
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
-    if (!tokenManual.trim()) {
-      toast.error("Ingresa un código válido");
+    if (tokenManual.length !== 4) {
+      toast.error("El código debe tener exactamente 4 dígitos");
       return;
     }
     setScanResult(null);
-    registrarAsistencia(tokenManual.trim().toUpperCase());
+    registrarAsistencia(tokenManual.trim());
   };
 
   return (
@@ -188,25 +188,25 @@ const EscanearAsistencia = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-extrabold text-slate-900 mb-1">Ingreso manual</h3>
-              <p className="text-sm text-slate-500">Digita el token alfanumérico proporcionado.</p>
+              <p className="text-sm text-slate-500">Digita el código de 4 dígitos proporcionado.</p>
             </div>
             
             <form onSubmit={handleManualSubmit} className="space-y-5">
               <input
                 type="text"
                 value={tokenManual}
-                onChange={(e) => setTokenManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                placeholder="A1B2C3D4"
-                maxLength={8}
-                className="w-full h-[54px] bg-slate-50 text-slate-900 rounded-2xl px-4 font-mono font-bold text-center text-xl tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all border border-transparent focus:border-slate-300 placeholder-slate-300"
+                onChange={(e) => setTokenManual(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="0000"
+                maxLength={4}
+                className="w-full h-[60px] bg-slate-50 text-slate-900 rounded-2xl px-4 font-mono font-bold text-center text-3xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all border border-transparent focus:border-slate-300 placeholder-slate-300"
                 disabled={enviando || isScanning}
               />
               <button
                 type="submit"
-                disabled={enviando || tokenManual.length < 8 || isScanning}
+                disabled={enviando || tokenManual.length !== 4 || isScanning}
                 className="w-full h-[54px] bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
               >
-                {enviando ? 'Verificando...' : 'Confirmar token'}
+                {enviando ? 'Verificando...' : 'Confirmar código'}
               </button>
             </form>
           </div>

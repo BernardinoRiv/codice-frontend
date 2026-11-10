@@ -13,13 +13,13 @@ const EstadoCuentaEstudiante = () => {
   const [carnetEstudiante, setCarnetEstudiante] = useState(null);
   const [idEstudiante, setIdEstudiante] = useState(null);
 
-  // Variables de Pago
+  // Variables de pago
   const [selectedCargos, setSelectedCargos] = useState([]);
   const [showModalPago, setShowModalPago] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pagoExitoso, setPagoExitoso] = useState(false);
 
-  // Estado de la Tarjeta
+  // Estado de la tarjeta
   const [tarjeta, setTarjeta] = useState({
     numero: '', mes: '', anio: '', cvv: '', titular: ''
   });
@@ -34,13 +34,21 @@ const EstadoCuentaEstudiante = () => {
     if (token) {
       try {
         const payload = JSON.parse(window.atob(token.split('.')[1]));
-        if (payload.carnet) setCarnetEstudiante(payload.carnet);
+        if (payload.carnet) {
+            setCarnetEstudiante(payload.carnet);
+        }
       } catch (error) {
         toast.error("Sesión inválida.");
       }
     }
-    cargarCiclosDisponibles();
   }, []);
+
+  // Cargar ciclos solo cuando ya tenemos el carnet del estudiante
+  useEffect(() => {
+    if (carnetEstudiante) {
+        cargarCiclosDisponibles();
+    }
+  }, [carnetEstudiante]);
 
   useEffect(() => {
     if (cicloSeleccionado && carnetEstudiante) {
@@ -52,17 +60,15 @@ const EstadoCuentaEstudiante = () => {
   const cargarCiclosDisponibles = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/ciclos`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${carnetEstudiante}/ciclos`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        const ciclosValidos = data.filter(c => c.estadoCiclo === 'ACTIVO' || c.estadoCiclo === 'FINALIZADO');
-        setCiclos(ciclosValidos);
+        const ciclosEstudiante = await res.json();
+        setCiclos(ciclosEstudiante);
         
-        if (ciclosValidos.length > 0) {
-          const cicloActivo = ciclosValidos.find(c => c.estadoCiclo === 'ACTIVO');
-          setCicloSeleccionado(cicloActivo ? cicloActivo.idCiclo : ciclosValidos[0].idCiclo);
+        if (ciclosEstudiante.length > 0) {
+          setCicloSeleccionado(ciclosEstudiante[0].idCiclo);
         } else {
           setCargando(false);
         }
@@ -95,6 +101,28 @@ const EstadoCuentaEstudiante = () => {
     }
   };
 
+  // Función para abrir la factura en otra pestaña (similar a manejarImpresion en MisClases)
+  const verFacturaEnOtraPestana = async (idPago) => {
+    const toastId = toast.loading('Generando documento...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/${idPago}/comprobante`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const fileUrl = URL.createObjectURL(blob);
+        window.open(fileUrl, '_blank');
+        toast.success('Documento generado', { id: toastId });
+      } else {
+        toast.error('Error al generar el documento', { id: toastId });
+      }
+    } catch (error) {
+      toast.error('Error de conexión al generar pdf', { id: toastId });
+    }
+  };
+
   const toggleCargoSelection = (index, isChecked) => {
     const cargos = datosCuenta.cargosPendientes;
     let nuevos = [];
@@ -121,30 +149,28 @@ const EstadoCuentaEstudiante = () => {
     ?.filter(c => selectedCargos.includes(c.idCargo))
     .reduce((sum, current) => sum + current.monto, 0) || 0;
 
-const handleProcesarPagoOnline = async (e) => {
+  const handleProcesarPagoOnline = async (e) => {
     e.preventDefault();
     if (tarjeta.numero.replace(/\s/g, '').length !== 16) return toast.error('El número de tarjeta debe tener 16 dígitos');
     if (!tarjeta.mes || !tarjeta.anio) return toast.error('Seleccione la fecha de vencimiento');
-    if (tarjeta.cvv.length < 3) return toast.error('CVV inválido');
+    if (tarjeta.cvv.length < 3) return toast.error('Cvv inválido');
     if (!tarjeta.titular.trim()) return toast.error('Ingrese el nombre del titular');
 
     setIsProcessing(true);
     try {
       const token = localStorage.getItem('token');
       
-      // 1. FORZAMOS EL PARSEO ESTRICTO DEL ID PARA QUE SPRING BOOT NO LO RECHACE
       const idValido = Number(datosCuenta.estudiante.idEstudiante || idEstudiante);
       
       if (!idValido || isNaN(idValido)) {
           throw new Error("No se pudo identificar tu usuario. Por favor, cierra sesión y vuelve a entrar.");
       }
 
-      // 2. CONSTRUIMOS EL PAYLOAD CON TIPOS DE DATOS SEGUROS
       const payload = {
         idEstudiante: idValido,
         idsCargosAPagar: selectedCargos, 
         arancelesAdicionales: [], 
-        montoRecibido: Number(totalAPagar.toFixed(2)), // Forzamos a Number (si va como String, Spring da error 400)
+        montoRecibido: Number(totalAPagar.toFixed(2)), 
         idMetodoPago: 2, 
         numeroReferencia: `ONL-${Date.now().toString().slice(-6)}`
       };
@@ -160,7 +186,6 @@ const handleProcesarPagoOnline = async (e) => {
 
       const data = await response.json();
       
-      // 3. MOSTRAMOS EL ERROR EXACTO QUE MANDA EL BACKEND EN EL TOAST
       if (!response.ok) {
           throw new Error(data.error || data.mensaje || data.message || 'El servidor rechazó el pago (Error 400)');
       }
@@ -188,13 +213,13 @@ const handleProcesarPagoOnline = async (e) => {
   return (
     <div className="w-full pb-32 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* MODAL DE PAGO EN LÍNEA (TARJETA) */}
+      {/* MODAL DE PAGO EN LÍNEA */}
       {showModalPago && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative">
             <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Pago en Línea Segura</h3>
+                <h3 className="text-lg font-bold text-slate-900">Pago en línea segura</h3>
                 <p className="text-xs text-slate-500 mt-1">Total a pagar: <strong className="text-emerald-600 text-sm">${totalAPagar.toFixed(2)}</strong></p>
               </div>
               <button onClick={() => setShowModalPago(false)} disabled={isProcessing} className="p-2 bg-slate-200/50 rounded-full text-slate-500 hover:text-black">
@@ -207,13 +232,13 @@ const handleProcesarPagoOnline = async (e) => {
                 <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                 <div className="flex justify-between items-start">
                   <svg className="w-10 h-8 opacity-80" viewBox="0 0 36 24" fill="none"><path d="M4 0C1.79086 0 0 1.79086 0 4V20C0 22.2091 1.79086 24 4 24H32C34.2091 24 36 22.2091 36 20V4C36 1.79086 34.2091 0 32 0H4Z" fill="white"/><path d="M4 4H32V8H4V4Z" fill="currentColor"/><path d="M4 12H12V16H4V12Z" fill="currentColor"/><path d="M16 12H24V16H16V12Z" fill="currentColor"/></svg>
-                  <span className="font-mono tracking-widest text-xs opacity-70">TARJETA CRÉDITO/DÉBITO</span>
+                  <span className="font-mono tracking-widest text-xs opacity-70">Tarjeta crédito/débito</span>
                 </div>
                 <div>
                   <p className="font-mono text-xl tracking-[0.2em] mb-2">{tarjeta.numero || '•••• •••• •••• ••••'}</p>
                   <div className="flex justify-between items-end">
-                    <p className="font-mono text-xs uppercase opacity-80 truncate w-32">{tarjeta.titular || 'TITULAR'}</p>
-                    <p className="font-mono text-xs opacity-80">{tarjeta.mes || 'MM'}/{tarjeta.anio?.toString().slice(-2) || 'YY'}</p>
+                    <p className="font-mono text-xs uppercase opacity-80 truncate w-32">{tarjeta.titular || 'Titular'}</p>
+                    <p className="font-mono text-xs opacity-80">{tarjeta.mes || 'Mes'}/{tarjeta.anio?.toString().slice(-2) || 'Año'}</p>
                   </div>
                 </div>
               </div>
@@ -233,17 +258,17 @@ const handleProcesarPagoOnline = async (e) => {
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Vencimiento</label>
                   <div className="flex gap-2">
                     <select required value={tarjeta.mes} onChange={(e) => setTarjeta({...tarjeta, mes: e.target.value})} className={`${inputClass} px-2 appearance-none`}>
-                      <option value="" disabled>MM</option>
+                      <option value="" disabled>Mes</option>
                       {Array.from({length: 12}, (_, i) => (i + 1).toString().padStart(2, '0')).map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                     <select required value={tarjeta.anio} onChange={(e) => setTarjeta({...tarjeta, anio: e.target.value})} className={`${inputClass} px-2 appearance-none`}>
-                      <option value="" disabled>AAAA</option>
+                      <option value="" disabled>Año</option>
                       {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">CVV</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Cvv</label>
                   <input type="password" required maxLength="4" value={tarjeta.cvv} onChange={(e) => setTarjeta({...tarjeta, cvv: e.target.value.replace(/\D/g, '')})} placeholder="•••" className={inputClass} />
                 </div>
               </div>
@@ -251,7 +276,7 @@ const handleProcesarPagoOnline = async (e) => {
               <div className="pt-4 border-t border-slate-100">
                 <button type="submit" disabled={isProcessing || pagoExitoso} className="w-full bg-black text-white py-4 rounded-xl font-bold transition-all flex items-center justify-center disabled:opacity-70">
                   {pagoExitoso ? (
-                     <><span className="text-emerald-400 mr-2">✓</span> ¡Transacción Aprobada!</>
+                     <><span className="text-emerald-400 mr-2">✓</span> ¡Transacción aprobada!</>
                   ) : isProcessing ? (
                     <span className="animate-pulse">Procesando pago...</span>
                   ) : (
@@ -293,7 +318,7 @@ const handleProcesarPagoOnline = async (e) => {
               >
                 {ciclos.map(c => (
                   <option key={c.idCiclo} value={c.idCiclo}>
-                    {c.codigoCiclo} ({c.estadoCiclo})
+                    {c.codigoCiclo}
                   </option>
                 ))}
               </select>
@@ -346,7 +371,6 @@ const handleProcesarPagoOnline = async (e) => {
                         const isSelected = selectedCargos.includes(cargo.idCargo);
                         
                         return (
-                          // LLAVE ÚNICA CORREGIDA PARA REACT AQUÍ
                           <label key={`${cargo.idCargo}-${index}`} className={`flex items-center p-4 border rounded-xl mb-2 transition-all duration-200 cursor-pointer ${isSelected ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                             <div className="mr-4">
                               <input 
@@ -359,10 +383,9 @@ const handleProcesarPagoOnline = async (e) => {
                             <div className="flex-1 flex justify-between items-center">
                               <div>
                                 <h4 className="font-bold text-slate-900">{cargo.concepto}</h4>
-                                <p className="text-xs text-slate-500 mt-0.5">{cargo.mes} - Vence: {cargo.fechaVencimiento}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{cargo.mes} Vence: {cargo.fechaVencimiento}</p>
                               </div>
                               
-                              {/* DESGLOSE DE MORA MOSTRADO AL USUARIO */}
                               <div className="text-right">
                                 <span className="font-extrabold text-lg text-slate-900">${cargo.monto.toFixed(2)}</span>
                                 {cargo.montoRecargo > 0 && (
@@ -388,10 +411,11 @@ const handleProcesarPagoOnline = async (e) => {
                     <table className="w-full text-left text-[13px]">
                       <thead className="bg-emerald-50 text-[10px] uppercase tracking-widest text-emerald-700 font-bold border-b border-emerald-100">
                         <tr>
-                          <th className="px-6 py-4">N° Recibo</th>
+                          <th className="px-6 py-4">N° recibo</th>
                           <th className="px-6 py-4">Fecha pago</th>
                           <th className="px-6 py-4">Concepto cancelado</th>
                           <th className="px-6 py-4 text-right">Monto pagado</th>
+                          <th className="px-6 py-4 text-center">Factura</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -401,6 +425,14 @@ const handleProcesarPagoOnline = async (e) => {
                             <td className="px-6 py-4 text-slate-600 font-medium">{pago.fechaPago}</td>
                             <td className="px-6 py-4 font-bold text-slate-900">{pago.concepto}</td>
                             <td className="px-6 py-4 text-right font-extrabold text-emerald-700">${pago.montoPagado.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-center">
+                              <button 
+                                onClick={() => verFacturaEnOtraPestana(pago.idPago)}
+                                className="px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
+                              >
+                                Ver factura
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
