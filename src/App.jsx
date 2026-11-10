@@ -28,13 +28,14 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
+import Facturas from './pages/finanzas/Facturas';
 
+import GestionCarreras from './pages/academico/GestionCarreras'; // <--- IMPORTACIÓN AÑADIDA AQUÍ
 
-// Nueva vista pública de admisión
+// Nueva vista púb lica de admisión
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 
 // Nueva vista dashboard
-import InicioGerencia from './pages/inicio/inicioGerencia';
 
 // Normaliza textos de roles (quita "ROLE_", tildes y pasa a mayúsculas con guion bajo)
 const normalizarRol = (rol = '') => {
@@ -220,6 +221,14 @@ function App() {
           } />
 
           {/* Gestión Académica y Ciclos */}
+          
+          {/* <--- RUTA DE CARRERAS AÑADIDA AQUÍ ---> */}
+          <Route path="carreras" element={
+            <RutaPorRol rolesPermitidos={['ADMINISTRADOR']}>
+              <GestionCarreras />
+            </RutaPorRol>
+          } />
+
           <Route path="oferta-academica" element={
             <RutaPorRol rolesPermitidos={['REGISTRO_ACADEMICO', 'EMPLEADO']}>
               <AperturaSeccion />
@@ -281,12 +290,13 @@ function App() {
               <CatalogoAranceles />
             </RutaPorRol>
           } />
-
-          <Route path="gerencia" element={
-            <RutaPorRol rolesPermitidos={['ADMINISTRADOR', 'DIRECTOR_REGIONAL']}>
-              <InicioGerencia />
+          {/* NUEVA RUTA DE FACTURAS */}
+          <Route path="facturas" element={
+            <RutaPorRol rolesPermitidos={['FINANZAS', 'ADMINISTRADOR']}>
+              <Facturas />
             </RutaPorRol>
           } />
+
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

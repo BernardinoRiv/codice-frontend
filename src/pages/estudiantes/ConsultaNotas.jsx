@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { generarPDFNotas } from "../../utils/generarPDFNotas";
 
 const ConsultaNotas = () => {
   const [pestanaActiva, setPestanaActiva] = useState('ciclo');
@@ -8,13 +7,21 @@ const ConsultaNotas = () => {
   const [historial, setHistorial] = useState(null);
   const [cargando, setCargando] = useState(true);
   
-  // Estado local para los datos del estudiante dinámicos
-  const [carnetEstudiante, setCarnetEstudiante] = useState(
-    localStorage.getItem('carnet') || 'AM260028'
-  );
-  const [nombreEstudiante, setNombreEstudiante] = useState(
-    localStorage.getItem('nombreCompleto') || 'Miguel Aguilar'
-  );
+  const [cicloFiltro, setCicloFiltro] = useState('TODOS');
+  const [carnetEstudiante, setCarnetEstudiante] = useState('');
+  const [nombreEstudiante, setNombreEstudiante] = useState('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(window.atob(token.split('.')[1]));
+        if (payload.carnet) setCarnetEstudiante(payload.carnet);
+      } catch (error) {}
+    }
+    const storedNombre = localStorage.getItem('nombreCompleto');
+    if (storedNombre) setNombreEstudiante(storedNombre);
+  }, []);
 
   useEffect(() => {
     cargarDatos();
@@ -53,7 +60,6 @@ const ConsultaNotas = () => {
       setDatosCiclo(dataNotas);
       setHistorial(dataHistorial);
 
-      // Si el historial o los datos devuelven información del estudiante real, la actualizamos dinámicamente
       if (dataHistorial?.carnet) {
         setCarnetEstudiante(dataHistorial.carnet);
         localStorage.setItem('carnet', dataHistorial.carnet);
@@ -70,23 +76,46 @@ const ConsultaNotas = () => {
     }
   };
 
-  const handleDescargarPDF = () => {
-    if (!datosCiclo) return;
+  const handleDescargarPDF = async () => {
+    const toastId = toast.loading('Generando PDF de notas...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/estudiantes/notas/pdf`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-    const estudiante = {
-      carnet: carnetEstudiante,
-      nombre: nombreEstudiante,
-      carrera: historial?.carrera || 'No asignada',
-      cum: historial?.cumAcumulado || 0,
-      uv: historial?.uvAcumuladas || 0
-    };
+      if (!response.ok) throw new Error('Error al generar el documento');
+      
+      const blob = await response.blob();
+      const fileUrl = URL.createObjectURL(blob);
+      window.open(fileUrl, '_blank');
+      
+      toast.success('Boleta generada correctamente', { id: toastId });
+    } catch (error) {
+      toast.error('Error al generar', { description: error.message, id: toastId });
+    }
+  };
 
-    const horario = [
-      { materia: 'Matemática I', lunes: '08:00-10:00', martes: '-', miercoles: '08:00-10:00', jueves: '-', viernes: '-', sabado: '-' }
-    ];
+  const handleDescargarHistorialPDF = async () => {
+    const toastId = toast.loading('Generando PDF del historial...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/estudiantes/historial/pdf?ciclo=${cicloFiltro}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-    generarPDFNotas(datosCiclo, estudiante, horario);
-    toast.success('Boleta descargada correctamente');
+      if (!response.ok) throw new Error('Error al generar el documento');
+      
+      const blob = await response.blob();
+      const fileUrl = URL.createObjectURL(blob);
+      window.open(fileUrl, '_blank');
+      
+      toast.success('Historial generado correctamente', { id: toastId });
+    } catch (error) {
+      toast.error('Error al generar', { description: error.message, id: toastId });
+    }
   };
 
   const formatNota = (nota) => {
@@ -108,6 +137,10 @@ const ConsultaNotas = () => {
     </div>
   );
 
+  const historicoFiltrado = cicloFiltro === 'TODOS'
+    ? historial?.materiasPorCiclo 
+    : historial?.materiasPorCiclo?.filter(c => c.codigoCiclo === cicloFiltro);
+
   return (
     <div className="w-full pb-20 font-sans text-gray-900">
       <div className="max-w-7xl mx-auto">
@@ -127,32 +160,47 @@ const ConsultaNotas = () => {
                 Descargar boleta de notas
               </button>
             )}
+
+            {pestanaActiva === 'historico' && historial && (
+              <button
+                onClick={handleDescargarHistorialPDF}
+                className="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Descargar historial {cicloFiltro !== 'TODOS' ? cicloFiltro : ''}
+              </button>
+            )}
           </div>
           
           <p className="text-gray-500 text-sm">
-            Resumen de notas para el ciclo actual: <span className="font-bold text-black">{datosCiclo?.ciclo || '...'}</span>
+            {pestanaActiva === 'ciclo' 
+              ? <>Resumen de notas para el ciclo actual: <span className="font-bold text-black">{datosCiclo?.ciclo || '...'}</span></>
+              : "Consulta tu récord de materias cursadas por ciclo."
+            }
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Estudiante</p>
-            <p className="text-sm font-semibold text-gray-900 truncate">{nombreEstudiante}</p>
-            <p className="text-[10px] font-mono text-gray-500">{carnetEstudiante}</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">{nombreEstudiante || '...'}</p>
+            <p className="text-[10px] font-mono text-gray-500">{carnetEstudiante || '...'}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Carrera</p>
-            <p className="text-sm font-semibold text-gray-900">{historial?.carrera || 'Cargando...'}</p>
+            <p className="text-sm font-semibold text-gray-900">{historial?.carrera || '...'}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">CUM Acumulado</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">CUM acumulado</p>
             <p className="text-2xl font-bold text-black">{historial?.cumAcumulado?.toFixed(1) || '0.0'}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">UV Acumuladas</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">UV acumuladas</p>
             <p className="text-2xl font-bold text-black">{historial?.uvAcumuladas || 0}</p>
           </div>
         </div>
@@ -166,7 +214,7 @@ const ConsultaNotas = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Ciclo Actual
+            Ciclo actual
           </button>
           <button
             onClick={() => setPestanaActiva('historico')}
@@ -176,7 +224,7 @@ const ConsultaNotas = () => {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            Histórico Académico
+            Histórico académico
           </button>
         </div>
 
@@ -192,13 +240,13 @@ const ConsultaNotas = () => {
                           Materia
                         </th>
                         <th colSpan={2} className="px-4 py-3 text-center text-black font-bold tracking-wide border-r border-gray-200">
-                          PERÍODO 1 <span className="text-gray-400 font-normal text-xs ml-1">(30%)</span>
+                          Período 1 <span className="text-gray-400 font-normal text-xs ml-1">(30%)</span>
                         </th>
                         <th colSpan={2} className="px-4 py-3 text-center text-black font-bold tracking-wide border-r border-gray-200">
-                          PERÍODO 2 <span className="text-gray-400 font-normal text-xs ml-1">(30%)</span>
+                          Período 2 <span className="text-gray-400 font-normal text-xs ml-1">(30%)</span>
                         </th>
                         <th colSpan={2} className="px-4 py-3 text-center text-black font-bold tracking-wide border-r border-gray-200">
-                          PERÍODO 3 <span className="text-gray-400 font-normal text-xs ml-1">(40%)</span>
+                          Período 3 <span className="text-gray-400 font-normal text-xs ml-1">(40%)</span>
                         </th>
                         <th rowSpan={2} className="px-6 py-4 text-center text-gray-500 font-semibold uppercase tracking-wider border-r border-gray-200 align-middle leading-tight">
                           Promedio real
@@ -231,49 +279,25 @@ const ConsultaNotas = () => {
                               </span>
                             </div>
                           </td>
-                          
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">
-                            {formatNota(materia.notas?.lab1)}
-                          </td>
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">
-                            {formatNota(materia.notas?.par1)}
-                          </td>
-                          
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">
-                            {formatNota(materia.notas?.lab2)}
-                          </td>
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">
-                            {formatNota(materia.notas?.par2)}
-                          </td>
-                          
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">
-                            {formatNota(materia.notas?.lab3)}
-                          </td>
-                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">
-                            {formatNota(materia.notas?.par3)}
-                          </td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">{formatNota(materia.notas?.lab1)}</td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">{formatNota(materia.notas?.par1)}</td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">{formatNota(materia.notas?.lab2)}</td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">{formatNota(materia.notas?.par2)}</td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm">{formatNota(materia.notas?.lab3)}</td>
+                          <td className="px-4 py-4 text-center border-r border-gray-100 text-sm bg-gray-50/30">{formatNota(materia.notas?.par3)}</td>
                           
                           <td className="px-6 py-4 text-center border-r border-gray-100">
                             <div className="inline-flex w-14 h-8 items-center justify-center bg-gray-100 rounded-lg font-mono text-gray-600 border border-gray-200 shadow-inner text-xs">
-                              {materia.promedioSinRedondear !== null && materia.promedioSinRedondear !== undefined 
-                                ? Number(materia.promedioSinRedondear).toFixed(3) 
-                                : '-'}
+                              {materia.promedioSinRedondear !== null && materia.promedioSinRedondear !== undefined ? Number(materia.promedioSinRedondear).toFixed(3) : '-'}
                             </div>
                           </td>
-
                           <td className="px-6 py-4 text-center">
                             {materia.promedioOficial !== null && materia.promedioOficial !== undefined ? (
-                                <div className={`inline-flex w-14 h-8 items-center justify-center rounded-lg font-bold border shadow-sm text-sm ${
-                                  Number(materia.promedioOficial) >= 6.0 
-                                    ? 'bg-green-50 text-green-700 border-green-200' 
-                                    : 'bg-red-50 text-red-700 border-red-200'
-                                }`}>
+                                <div className={`inline-flex w-14 h-8 items-center justify-center rounded-lg font-bold border shadow-sm text-sm ${Number(materia.promedioOficial) >= 6.0 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                   {Number(materia.promedioOficial).toFixed(1)}
                                 </div>
                             ) : (
-                                <div className="inline-flex w-14 h-8 items-center justify-center bg-gray-50 rounded-lg font-bold text-gray-400 border border-gray-200 shadow-sm text-sm">
-                                  -
-                                </div>
+                                <div className="inline-flex w-14 h-8 items-center justify-center bg-gray-50 rounded-lg font-bold text-gray-400 border border-gray-200 shadow-sm text-sm">-</div>
                             )}
                           </td>
                         </tr>
@@ -284,10 +308,6 @@ const ConsultaNotas = () => {
               </div>
             ) : (
               <div className="text-center py-20 bg-gray-50 rounded-2xl border border-gray-200 border-dashed">
-                <svg className="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <h3 className="text-sm font-medium text-gray-900">No hay materias inscritas</h3>
                 <p className="mt-1 text-sm text-gray-500">No tienes materias registradas para el ciclo actual.</p>
               </div>
             )}
@@ -296,19 +316,35 @@ const ConsultaNotas = () => {
 
         {pestanaActiva === 'historico' && (
           <div>
-            {historial?.materiasPorCiclo && historial.materiasPorCiclo.length > 0 ? (
-              <div className="space-y-6">
-                {historial.materiasPorCiclo.map((ciclo) => (
+            {historial?.materiasPorCiclo && historial.materiasPorCiclo.length > 0 && (
+              <div className="mb-4 flex justify-end">
+                <div className="w-64">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Filtrar por ciclo</label>
+                  <select 
+                    value={cicloFiltro}
+                    onChange={(e) => setCicloFiltro(e.target.value)}
+                    className="w-full bg-white border border-gray-200 text-gray-700 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-black font-semibold"
+                  >
+                    <option value="TODOS">Todos los ciclos</option>
+                    {historial.materiasPorCiclo.map(c => (
+                      <option key={c.codigoCiclo} value={c.codigoCiclo}>{c.codigoCiclo}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {historicoFiltrado && historicoFiltrado.length > 0 ? (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                {historicoFiltrado.map((ciclo) => (
                   <div key={ciclo.codigoCiclo} className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
                     <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-gray-900">{ciclo.codigoCiclo}</h3>
-                        <p className="text-[10px] text-gray-500">Año {ciclo.anio} Ciclo {ciclo.numeroCiclo}</p>
+                        <p className="text-[10px] text-gray-500">Año {ciclo.anio} ciclo {ciclo.numeroCiclo}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                        ciclo.estadoCiclo === 'ACTIVO' 
-                          ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                          : 'text-gray-700 bg-gray-100 border-gray-200'
+                        ciclo.estadoCiclo === 'ACTIVO' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-gray-700 bg-gray-100 border-gray-200'
                       }`}>
                         {ciclo.estadoCiclo}
                       </span>
@@ -321,7 +357,7 @@ const ConsultaNotas = () => {
                             <th className="px-6 py-3 text-left font-semibold">Código</th>
                             <th className="px-6 py-3 text-left font-semibold">Materia</th>
                             <th className="px-6 py-3 text-center font-semibold">UV</th>
-                            <th className="px-6 py-3 text-center font-semibold">Nota Final</th>
+                            <th className="px-6 py-3 text-center font-semibold">Nota final</th>
                             <th className="px-6 py-3 text-center font-semibold">Estado</th>
                           </tr>
                         </thead>
@@ -346,35 +382,10 @@ const ConsultaNotas = () => {
                     </div>
                   </div>
                 ))}
-
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CUM</p>
-                      <p className="text-xl font-bold text-black">{historial.cumAcumulado?.toFixed(1)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">UV Totales</p>
-                      <p className="text-xl font-bold text-black">{historial.uvAcumuladas}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Aprobadas</p>
-                      <p className="text-xl font-bold text-green-700">{historial.totalMateriasAprobadas}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reprobadas</p>
-                      <p className="text-xl font-bold text-red-700">{historial.totalMateriasReprobadas}</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-center py-20 bg-gray-50 rounded-2xl border border-gray-200 border-dashed">
-                <svg className="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-                <h3 className="text-sm font-medium text-gray-900">Sin histórico académico</h3>
-                <p className="mt-1 text-sm text-gray-500">Aún no tienes materias en ciclos anteriores.</p>
+                <p className="mt-1 text-sm text-gray-500">No hay materias para mostrar en este filtro.</p>
               </div>
             )}
           </div>
