@@ -1227,9 +1227,9 @@ function ListaDocentes() {
                                 cargandoCatalogos || errorCatalogos || isSaving
                               }
                               onClick={() => handleAbrirCambiarEstado(docente)}
-                              title="Cambiar estado"
+                              title={esActivo ? "Desactivar docente" : "Activar docente"}
                               aria-label={`Cambiar estado de ${docente.nombres} ${docente.apellidos}`}
-                              className={`inline-flex items-center gap-2 transition-colors p-2.5 rounded-lg border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed ${
+                              className={`inline-flex items-center justify-center transition-colors w-9 h-9 rounded-lg border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed ${
                                 esActivo
                                   ? "text-slate-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100"
                                   : "text-slate-400 hover:text-green-600 hover:bg-green-50 hover:border-green-100"
@@ -1264,9 +1264,6 @@ function ListaDocentes() {
                                   />
                                 </svg>
                               )}
-                              <span className="text-xs font-semibold">
-                                Estado
-                              </span>
                             </button>
                           </div>
                         </td>

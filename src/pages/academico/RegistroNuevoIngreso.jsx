@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
-// --- Funciones Auxiliares ---
 const extraerDigitos = (texto = '') => {
   let resultado = '';
   const str = String(texto || '');
@@ -26,6 +25,14 @@ const extraerAlfanumerico = (texto = '') => {
 const formatearDui = (valor = '') => {
   const digitos = extraerDigitos(valor).slice(0, 9);
   if (digitos.length > 8) return `${digitos.slice(0, 8)}-${digitos.slice(8, 9)}`;
+  return digitos;
+};
+
+const formatearNit = (valor = '') => {
+  const digitos = extraerDigitos(valor).slice(0, 14);
+  if (digitos.length > 13) return `${digitos.slice(0, 4)}-${digitos.slice(4, 10)}-${digitos.slice(10, 13)}-${digitos.slice(13, 14)}`;
+  if (digitos.length > 10) return `${digitos.slice(0, 4)}-${digitos.slice(4, 10)}-${digitos.slice(10)}`;
+  if (digitos.length > 4) return `${digitos.slice(0, 4)}-${digitos.slice(4)}`;
   return digitos;
 };
 
@@ -70,6 +77,12 @@ const esCorreoValido = (correo) => {
   return punto > arroba + 1 && punto < limpio.length - 1;
 };
 
+const calcularFechaMaxima = (edadMinima) => {
+  const hoy = new Date();
+  hoy.setFullYear(hoy.getFullYear() - edadMinima);
+  return hoy.toISOString().split('T')[0];
+};
+
 const obtenerSedeDesdeToken = () => {
   try {
     const token = localStorage.getItem('token');
@@ -83,7 +96,18 @@ const obtenerSedeDesdeToken = () => {
   }
 };
 
-// --- SelectBuscador ---
+const ORDEN_DIAS = {
+  'LUNES': 1,
+  'MARTES': 2,
+  'MIÉRCOLES': 3,
+  'MIERCOLES': 3,
+  'JUEVES': 4,
+  'VIERNES': 5,
+  'SÁBADO': 6,
+  'SABADO': 6,
+  'DOMINGO': 7
+};
+
 function SelectBuscador({ label, loading = false, value, onChange, options = [], placeholder = '-- Seleccione --', searchPlaceholder = 'Buscar...', disabled = false }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -143,7 +167,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
             if (!open) setSearch('');
           }
         }}
-        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
+        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
       >
         <span className={`truncate ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
           {seleccionado ? (seleccionado.nombre || seleccionado.nombreCarrera || seleccionado.nombreSede) : placeholder}
@@ -167,7 +191,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
                 autoFocus
-                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
+                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-base focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
               />
               {(search || seleccionado) && (
                 <button type="button" onClick={handleLimpiar} className="absolute right-2.5 p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
@@ -208,6 +232,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
 export default function RegistroNuevoIngreso() {
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
+  const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18));
   
   const [isVerifying, setIsVerifying] = useState(false);
   const [documentoVerificado, setDocumentoVerificado] = useState(false);
@@ -232,7 +257,31 @@ export default function RegistroNuevoIngreso() {
     idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
   });
 
-  const fechaHoy = new Date().toISOString().split('T')[0];
+  const esTipoDui = () => {
+    if (String(formData.idTipoDocumento) === '1') return true;
+    const docOpt = catalogos.tiposDocumento?.find(d => String(d.id) === String(formData.idTipoDocumento));
+    return (docOpt?.nombre || '').toUpperCase().includes('DUI');
+  };
+
+  const esTipoNit = () => {
+    if (String(formData.idTipoDocumento) === '3') return true;
+    const docOpt = catalogos.tiposDocumento?.find(d => String(d.id) === String(formData.idTipoDocumento));
+    return (docOpt?.nombre || '').toUpperCase().includes('NIT');
+  };
+
+  useEffect(() => {
+    if (formData.idTipoDocumento && catalogos.tiposDocumento.length > 0) {
+      const edadMinima = esTipoDui() ? 18 : 15;
+      const maxFecha = calcularFechaMaxima(edadMinima);
+      setMaxFechaNacimiento(maxFecha);
+      
+      if (formData.fechaNacimiento && formData.fechaNacimiento > maxFecha) {
+        setFormData(prev => ({ ...prev, fechaNacimiento: '' }));
+      }
+    } else {
+      setMaxFechaNacimiento(calcularFechaMaxima(18));
+    }
+  }, [formData.idTipoDocumento, catalogos.tiposDocumento]);
 
   useEffect(() => {
     const fetchCatalogos = async () => {
@@ -244,7 +293,7 @@ export default function RegistroNuevoIngreso() {
         if (res.ok) {
           const data = await res.json();
           setCatalogos({
-            tiposDocumento: data['tipos_documento'] || [], 
+            tiposDocumento: data['tipos_documento'] || data['tipos-documento'] || [], 
             sedes: data['sedes'] || [], 
             departamentos: data['departamentos'] || [],
             carreras: data['carreras'] || []
@@ -357,15 +406,36 @@ export default function RegistroNuevoIngreso() {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/nuevo-ingreso?idPensum=${formData.idPensum}&idSede=${formData.idSede}`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
-          setOfertaAcademica(data);
+          
+          const dataOrdenada = data.map(materia => {
+            return {
+              ...materia,
+              gruposDisponibles: materia.gruposDisponibles.map(grupo => {
+                return {
+                  ...grupo,
+                  horarios: [...grupo.horarios].sort((a, b) => {
+                    const diaA = (a.diaSemana || '').toUpperCase();
+                    const diaB = (b.diaSemana || '').toUpperCase();
+                    const ordenA = ORDEN_DIAS[diaA] || 99;
+                    const ordenB = ORDEN_DIAS[diaB] || 99;
+                    
+                    if (ordenA !== ordenB) {
+                      return ordenA - ordenB;
+                    }
+                    return (a.horaInicio || '').localeCompare(b.horaInicio || '');
+                  })
+                };
+              })
+            };
+          });
+
+          setOfertaAcademica(dataOrdenada);
           setFormData(prev => ({ ...prev, idGruposSeleccionados: [] }));
         }
       } catch (error) { toast.error('Error al cargar horarios.'); } finally { setCargandoOferta(false); }
     };
     fetchOferta();
   }, [formData.idPensum, formData.idSede]);
-
-  const esTipoDui = () => String(formData.idTipoDocumento) === '1';
 
   const handleReset = () => {
     toast.dismiss();
@@ -391,7 +461,16 @@ export default function RegistroNuevoIngreso() {
     toast.dismiss();
     setDocumentoVerificado(false);
     setPersonaExistente(false);
-    const nuevoValor = esTipoDui() ? formatearDui(valorInput) : extraerAlfanumerico(valorInput).slice(0, 15);
+    
+    let nuevoValor = valorInput;
+    if (esTipoDui()) {
+      nuevoValor = formatearDui(valorInput);
+    } else if (esTipoNit()) {
+      nuevoValor = formatearNit(valorInput);
+    } else {
+      nuevoValor = extraerAlfanumerico(valorInput).slice(0, 15);
+    }
+    
     setFormData(p => ({ ...p, numeroDocumento: nuevoValor }));
   };
 
@@ -403,14 +482,26 @@ export default function RegistroNuevoIngreso() {
       toast.error('Datos incompletos', { description: 'Selecciona el tipo e ingresa el número de documento.' });
       return;
     }
+    
     let docParaEnviar = formData.numeroDocumento.trim();
     if (esTipoDui()) {
       const digitosDui = extraerDigitos(docParaEnviar);
-      if (digitosDui.length !== 9 || !esDuiValido(digitosDui)) {
+      if (digitosDui.length !== 9) {
+        toast.error('DUI incompleto', { description: 'Ingresa los 9 dígitos del DUI (formato 00000000-0).' });
+        return;
+      }
+      if (!esDuiValido(digitosDui)) {
         toast.error('DUI no válido', { description: 'El DUI ingresado no supera la validación matemática.' });
         return;
       }
       docParaEnviar = formatearDui(digitosDui);
+    } else if (esTipoNit()) {
+      const digitosNit = extraerDigitos(docParaEnviar);
+      if (digitosNit.length !== 14) {
+        toast.error('NIT incompleto', { description: 'Ingresa los 14 dígitos del NIT (formato 0000-000000-000-0).' });
+        return;
+      }
+      docParaEnviar = formatearNit(digitosNit);
     } else {
       const alfanum = extraerAlfanumerico(docParaEnviar);
       if (!esPasaporteValido(alfanum)) {
@@ -446,7 +537,11 @@ export default function RegistroNuevoIngreso() {
         toast.info('Registro existente', { description: 'El estudiante ya se encuentra en el sistema.' });
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error('Rechazado por el servidor', { description: errData.mensaje || `HTTP ${res.status}` });
+        let msjDetallado = errData.mensaje;
+        if (!msjDetallado && errData.detalles) {
+          msjDetallado = Object.entries(errData.detalles).map(([k, v]) => `${v}`).join(' | ');
+        }
+        toast.error('Rechazado por el servidor', { description: msjDetallado || `HTTP ${res.status}` });
       }
     } catch (e) { toast.error('Error de conexión', { description: 'Revisa tu conexión con el servidor.' }); } 
     finally { setIsVerifying(false); }
@@ -506,7 +601,10 @@ export default function RegistroNuevoIngreso() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.mensaje || 'Error al generar pre-matrícula.');
+      if (!res.ok) {
+        const detalle = data?.detalles ? Object.entries(data.detalles).map(([c, m]) => `${c}: ${m}`).join(' | ') : data.mensaje;
+        throw new Error(detalle || 'Error al generar pre-matrícula.');
+      }
       
       setModalConfirmar(false);
       handleReset();
@@ -518,7 +616,6 @@ export default function RegistroNuevoIngreso() {
     }
   };
 
-  // --- CÁLCULO FINANCIERO CORREGIDO ---
   const getFinanzas = () => {
     const cuotaMensualBase = tipoBeca === '2' ? arancelesCiclo.cuotaFranja : arancelesCiclo.cuota;
     const subtotal = arancelesCiclo.matricula + (cuotaMensualBase * 6);
@@ -548,9 +645,9 @@ export default function RegistroNuevoIngreso() {
           }
 
           if (isFeria) {
-            descCuotaUnica = valorDescCuota; // Solo el primer mes
+            descCuotaUnica = valorDescCuota;
           } else {
-            descCuotaTotal = valorDescCuota * 6; // Todos los meses
+            descCuotaTotal = valorDescCuota * 6;
           }
         }
       }
@@ -568,11 +665,20 @@ export default function RegistroNuevoIngreso() {
 
   const finanzas = getFinanzas();
 
-  // --- Lógica UI Progreso ---
   const digitosDocActual = extraerDigitos(formData.numeroDocumento);
   const alfanumDocActual = extraerAlfanumerico(formData.numeroDocumento);
-  const documentoFormatoCompleto = esTipoDui() ? digitosDocActual.length === 9 : alfanumDocActual.length >= 5;
-  const docValido = documentoFormatoCompleto && (esTipoDui() ? esDuiValido(digitosDocActual) : esPasaporteValido(alfanumDocActual));
+  
+  const documentoFormatoCompleto = esTipoDui()
+    ? digitosDocActual.length === 9
+    : esTipoNit()
+      ? digitosDocActual.length === 14
+      : alfanumDocActual.length >= 5;
+
+  const docValido = documentoFormatoCompleto && (
+    esTipoDui() ? esDuiValido(digitosDocActual)
+    : esTipoNit() ? digitosDocActual.length === 14
+    : esPasaporteValido(alfanumDocActual)
+  );
 
   const c1 = [formData.nombres, formData.apellidos, formData.idTipoDocumento, docValido, formData.fechaNacimiento, formData.sexo].filter(Boolean).length;
   const c2 = [esTelefonoValido(formData.telefono), esCorreoValido(formData.correoPersonal), formData.idDepartamento, formData.idDistrito, formData.direccion].filter(Boolean).length;
@@ -619,7 +725,7 @@ export default function RegistroNuevoIngreso() {
   const getCarreraTexto = () => !formData.idCarreraSede ? '---' : (catalogos.carreras?.find(a => String(a.idCarreraSede) === String(formData.idCarreraSede))?.nombreCarrera || '---');
   const getSedeTexto = () => !formData.idSede ? '---' : (catalogos.sedes?.find(s => String(s.id) === String(formData.idSede))?.nombre || '---');
 
-  const inputClass = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed placeholder-slate-400";
+  const inputClass = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed placeholder-slate-400";
   const labelClass = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
   const sectionTitleClass = "text-[12px] font-extrabold text-slate-900 uppercase tracking-widest mb-5 pb-2 border-b border-slate-200 flex items-center gap-2";
 
@@ -640,13 +746,13 @@ export default function RegistroNuevoIngreso() {
       <form onSubmit={handlePreSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         <div className="lg:col-span-7 xl:col-span-8 space-y-10">
           
-          {/* 1. IDENTIDAD */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900 rounded-l-2xl"></div>
             
             <div className="flex justify-between items-center mb-4">
               <h3 className={sectionTitleClass.replace('mb-5 pb-2 border-b border-slate-200', 'mb-0 border-0')}>Paso 1: Verificación de identidad</h3>
               <button type="button" onClick={handleReset} className="text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 flex items-center gap-1.5 transition-colors bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 Restablecer
               </button>
             </div>
@@ -658,13 +764,13 @@ export default function RegistroNuevoIngreso() {
               <div className="md:col-span-5">
                 <div className="h-5 mb-1.5 ml-1 flex items-center justify-between">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Número de doc.</label>
-                  {formData.numeroDocumento && (
+                  {documentoFormatoCompleto && (
                     <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full leading-none ${docValido ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                      {docValido ? (esTipoDui() ? '✓ DUI auténtico' : '✓ Válido') : (esTipoDui() ? '✕ Inválido' : '✕ Formato')}
+                      {docValido ? (esTipoDui() ? '✓ DUI auténtico' : esTipoNit() ? '✓ Formato válido' : '✓ Válido') : (esTipoDui() ? '✕ Inválido' : '✕ Formato')}
                     </span>
                   )}
                 </div>
-                <input type="text" value={formData.numeroDocumento} onChange={e => handleNumeroDocumentoChange(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); verificarDocumento(); } }} disabled={!formData.idTipoDocumento || isVerifying || documentoVerificado} className={`${inputClass} ${!formData.idTipoDocumento ? 'bg-slate-100/50 cursor-not-allowed' : ''}`} placeholder={esTipoDui() ? '00000000-0' : 'Ej. A12345678'} />
+                <input type="text" inputMode={esTipoDui() || esTipoNit() ? "numeric" : "text"} value={formData.numeroDocumento} onChange={e => handleNumeroDocumentoChange(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); verificarDocumento(); } }} disabled={!formData.idTipoDocumento || isVerifying || documentoVerificado} className={`${inputClass} ${!formData.idTipoDocumento ? 'bg-slate-100/50 cursor-not-allowed' : ''}`} placeholder={esTipoDui() ? '00000000-0' : esTipoNit() ? '0000-000000-000-0' : 'Ej. A12345678'} />
               </div>
               <div className="md:col-span-3">
                 <button type="button" onClick={verificarDocumento} disabled={!formData.numeroDocumento || documentoVerificado || isVerifying} className="w-full h-[50px] bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center justify-center gap-2">
@@ -685,20 +791,18 @@ export default function RegistroNuevoIngreso() {
             )}
           </div>
 
-          {/* 2. DATOS BIOGRÁFICOS Y CONTACTO */}
           <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Datos biográficos y de contacto {personaExistente && <span className="ml-2 text-[10px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">Bloqueado</span>}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
               <div><label className={labelClass}>Nombres</label><input required type="text" disabled={personaExistente} value={formData.nombres} onChange={e => setFormData(p => ({...p, nombres: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. JUAN CARLOS" /></div>
               <div><label className={labelClass}>Apellidos</label><input required type="text" disabled={personaExistente} value={formData.apellidos} onChange={e => setFormData(p => ({...p, apellidos: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. PEREZ GARCIA" /></div>
-              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label></div><input required type="date" disabled={personaExistente} max={fechaHoy} value={formData.fechaNacimiento} onChange={e => setFormData(p => ({...p, fechaNacimiento: e.target.value}))} className={inputClass} /></div>
+              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label></div><input required type="date" disabled={personaExistente} max={maxFechaNacimiento} value={formData.fechaNacimiento} onChange={e => setFormData(p => ({...p, fechaNacimiento: e.target.value}))} className={inputClass} /></div>
               <div><SelectBuscador label="Sexo" value={formData.sexo} onChange={v => setFormData(p => ({...p, sexo: v}))} options={[{id: 'M', nombre: 'Masculino'}, {id: 'F', nombre: 'Femenino'}]} placeholder="-- Seleccione --" disabled={personaExistente} /></div>
               <div><div className="h-5 mb-1.5 ml-1 flex items-center justify-between"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Teléfono</label>{formData.telefono && !['2', '6', '7'].includes(formData.telefono.charAt(0)) && (<span className="text-[10px] font-bold text-red-600">Debe iniciar con 2, 6 o 7</span>)}</div><input required type="tel" maxLength={9} disabled={personaExistente} value={formData.telefono} onChange={e => handleTelefonoChange(e.target.value)} className={inputClass} placeholder="7000-0000" /></div>
               <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label></div><input required type="email" disabled={personaExistente} value={formData.correoPersonal} onChange={e => setFormData(p => ({...p, correoPersonal: e.target.value.toLowerCase().trim()}))} className={inputClass} placeholder="juan@gmail.com" /></div>
             </div>
           </div>
 
-          {/* 3. RESIDENCIA */}
           <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div> Datos de residencia {personaExistente && <span className="ml-2 text-[10px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">Bloqueado</span>}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -708,17 +812,15 @@ export default function RegistroNuevoIngreso() {
             </div>
           </div>
 
-          {/* 4. PROYECCIÓN ACADÉMICA */}
           <div className={`transition-opacity duration-300 ${(!documentoVerificado || personaExistente) ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Proyección académica</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
               <div className="md:col-span-1"><SelectBuscador label="Sede operativa" disabled={true} value={formData.idSede} onChange={v => setFormData(p => ({...p, idSede: v}))} options={catalogos.sedes} placeholder="-- Sede --" /></div>
               <div className="md:col-span-1"><SelectBuscador label="Carrera solicitada" disabled={personaExistente} value={formData.idCarreraSede} onChange={v => setFormData(p => ({...p, idCarreraSede: v}))} options={catalogos.carreras} placeholder="-- Seleccione carrera --" searchPlaceholder="Buscar carrera..." /></div>
-              <div className="md:col-span-1"><label className={labelClass}>Pensum vigente</label><div className={`w-full h-[50px] bg-slate-50/50 border border-slate-200 rounded-xl px-4 flex items-center text-sm cursor-not-allowed ${pensumVigente ? 'text-slate-900 font-extrabold' : 'text-slate-500 font-medium'}`}>{pensumVigente ? `Plan ${pensumVigente.version}` : '-- Autocompletado --'}</div></div>
+              <div className="md:col-span-1"><label className={labelClass}>Pensum vigente</label><div className={`w-full h-[50px] bg-slate-50/50 border border-slate-200 rounded-xl px-4 flex items-center text-base cursor-not-allowed ${pensumVigente ? 'text-slate-900 font-extrabold' : 'text-slate-500 font-medium'}`}>{pensumVigente ? `Plan ${pensumVigente.version}` : '-- Autocompletado --'}</div></div>
             </div>
           </div>
 
-          {/* 5. OFERTA ACADÉMICA Y FINANZAS */}
           <div className={`transition-opacity duration-300 ${(!formData.idPensum || personaExistente) ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
              <div className="flex justify-between items-center mb-5 pb-2 border-b border-slate-200">
                <h3 className="text-[12px] font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div> Selección de horarios {cicloActivoStr ? `— ${cicloActivoStr}` : ''}</h3>
@@ -756,12 +858,10 @@ export default function RegistroNuevoIngreso() {
                </div>
              )}
 
-             {/* SELECTORES DE BENEFICIO Y BECA */}
              <div className={`mt-8 pt-8 border-t border-slate-200 transition-opacity duration-300 ${personaExistente ? 'opacity-50 pointer-events-none' : ''}`}>
                <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Resumen Financiero</h3>
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                 {/* Selector de Beca (Siempre visible) */}
                  <div>
                    <SelectBuscador 
                      label="Tipo de Beca del Alumno" 
@@ -773,7 +873,6 @@ export default function RegistroNuevoIngreso() {
                    />
                  </div>
                  
-                 {/* Selector de Promoción (Solo se muestra si no tiene beca) */}
                  {tipoBeca === '1' && (
                    <div className="animate-in fade-in duration-300">
                      <SelectBuscador 
@@ -807,7 +906,6 @@ export default function RegistroNuevoIngreso() {
           </div>
         </div>
 
-        {/* SIDEBAR DERECHO */}
         <div className="lg:col-span-5 xl:col-span-4 hidden lg:block relative">
           <div className="bg-white rounded-2xl p-7 border border-slate-200 shadow-sm sticky top-8 transition-all duration-300">
             <div className="mb-10 flex justify-between items-start">
@@ -850,7 +948,6 @@ export default function RegistroNuevoIngreso() {
         </div>
       </form>
 
-      {/* MODAL DE CONFIRMACIÓN */}
       {modalConfirmar && createPortal(
         <div className="fixed inset-0 z-[9999] overflow-y-auto font-sans">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={() => !isLoading && setModalConfirmar(false)}></div>

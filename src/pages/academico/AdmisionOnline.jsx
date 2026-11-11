@@ -365,7 +365,12 @@ export default function AdmisionOnline() {
   const verificarDocumento = async () => {
     if (identityBusy.current || documentoVerificado) return;
     const error = errorDocumento(personalData.idTipoDocumento, personalData.numeroDocumento);
-    if (error) { setErroresPaso1({ numeroDocumento: error }); return; }
+    
+    // EN LUGAR DE ACTUALIZAR EL ESTADO erroresPaso1, LOGRAMOS UN TOAST
+    if (error) { 
+      toast.error('Documento incompleto o inválido', { description: error });
+      return; 
+    }
     
     identityBusy.current = true;
     setValidandoDocumento(true);
@@ -376,7 +381,7 @@ export default function AdmisionOnline() {
       if (!mounted.current || version !== identityVersion.current) return;
       if (r?.requiereLogin || r?.esEstudianteActivo) {
         limpiarVerificacion();
-        setErroresPaso1({ numeroDocumento: r.mensaje || "Ya tienes credenciales. Inicia sesión desde el portal." });
+        toast.error('Atención', { description: r.mensaje || "Ya tienes credenciales. Inicia sesión desde el portal." });
         return;
       }
       if (r?.existePersona && r?.requiereVerificacionCorreo) {
@@ -393,7 +398,7 @@ export default function AdmisionOnline() {
         return;
       }
       if (r?.existePersona) {
-        setErroresPaso1({ numeroDocumento: r.mensaje || "No es posible continuar con este documento." });
+        toast.error('Atención', { description: r.mensaje || "No es posible continuar con este documento." });
         return;
       }
       limpiarVerificacion();
@@ -401,7 +406,9 @@ export default function AdmisionOnline() {
       setDocumentoVerificado(true);
       toast.success("Documento disponible. Completa tus datos.");
     } catch (e) {
-      if (mounted.current && version === identityVersion.current) setErroresPaso1({ numeroDocumento: obtenerMensajeError(e) });
+      if (mounted.current && version === identityVersion.current) {
+         toast.error('Error de verificación', { description: obtenerMensajeError(e) });
+      }
     } finally {
       identityBusy.current = false;
       if (mounted.current) setValidandoDocumento(false);
@@ -677,7 +684,7 @@ export default function AdmisionOnline() {
                           className={inputClass}
                           placeholder={String(personalData.idTipoDocumento) === "1" ? "00000000-0" : String(personalData.idTipoDocumento) === "3" ? "0000-000000-000-0" : "Ej. A123456789"}
                         />
-                        {erroresPaso1.numeroDocumento && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.numeroDocumento}</p>}
+                        {/* Se eliminó el <p> de errores inferior para el documento */}
                       </div>
                       <div className="lg:col-span-3">
                         <button
@@ -725,7 +732,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("nombres", e.target.value.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ ]/g, ""))}
                           className={inputClass} placeholder="EJ. JUAN CARLOS"
                         />
-                        {erroresPaso1.nombres && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.nombres}</p>}
+                        {/* Se eliminó el <p> de errores inferior */}
                       </div>
                       <div>
                         <label className={labelClass} htmlFor="admision-apellidos">Apellidos *</label>
@@ -734,7 +741,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("apellidos", e.target.value.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ ]/g, ""))}
                           className={inputClass} placeholder="EJ. PEREZ GARCIA"
                         />
-                        {erroresPaso1.apellidos && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.apellidos}</p>}
+                        {/* Se eliminó el <p> de errores inferior */}
                       </div>
                       <div>
                         <label className={labelClass} htmlFor="admision-fechaNacimiento">Fecha de nacimiento *</label>
@@ -743,7 +750,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("fechaNacimiento", e.target.value)}
                           className={inputClass}
                         />
-                        {erroresPaso1.fechaNacimiento && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.fechaNacimiento}</p>}
+                        {/* Se eliminó el <p> de errores inferior */}
                       </div>
                       <div>
                         <SelectBuscador
@@ -759,7 +766,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("telefono", formatoTelefono(e.target.value))}
                           className={inputClass}
                         />
-                        {erroresPaso1.telefono && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.telefono}</p>}
+                        {/* Se eliminó el <p> de errores inferior */}
                       </div>
                       <div>
                         <label className={labelClass} htmlFor="admision-correoPersonal">Correo electrónico *</label>
@@ -768,7 +775,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("correoPersonal", e.target.value.toLowerCase().trim())}
                           className={inputClass}
                         />
-                        {erroresPaso1.correoPersonal && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.correoPersonal}</p>}
+                        {/* Se eliminó el <p> de errores inferior (solo se conservó la indicación si es existente) */}
                         {personaExistente && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 ml-1">Fijo por expediente.</p>}
                       </div>
                       <div>
@@ -793,7 +800,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => actualizarDato("direccion", e.target.value)}
                           className={inputClass}
                         />
-                        {erroresPaso1.direccion && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresPaso1.direccion}</p>}
+                        {/* Se eliminó el <p> de errores inferior */}
                       </div>
                     </fieldset>
 
@@ -958,7 +965,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => setCardData((prev) => ({ ...prev, numero: e.target.value.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim() }))}
                           className={inputClass} placeholder="0000 0000 0000 0000"
                         />
-                        {erroresTarjeta.numero && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresTarjeta.numero}</p>}
+                        {/* Se eliminó el <p> de errores inferior para tarjeta */}
                       </div>
                       <div>
                         <label className={labelClass} htmlFor="tarjeta-titular">Titular de la tarjeta</label>
@@ -967,7 +974,7 @@ export default function AdmisionOnline() {
                           onChange={(e) => setCardData((prev) => ({ ...prev, titular: e.target.value.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ ]/g, "") }))}
                           className={inputClass} placeholder="EJ. JUAN PEREZ"
                         />
-                        {erroresTarjeta.titular && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresTarjeta.titular}</p>}
+                        {/* Se eliminó el <p> de errores inferior para tarjeta */}
                       </div>
                       <div className="grid grid-cols-2 gap-5">
                         <div>
@@ -980,7 +987,7 @@ export default function AdmisionOnline() {
                             }}
                             className={inputClass}
                           />
-                          {erroresTarjeta.expiracion && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresTarjeta.expiracion}</p>}
+                          {/* Se eliminó el <p> de errores inferior para tarjeta */}
                         </div>
                         <div>
                           <label className={labelClass} htmlFor="tarjeta-cvv">CVV</label>
@@ -989,7 +996,7 @@ export default function AdmisionOnline() {
                             onChange={(e) => setCardData((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
                             className={inputClass} placeholder="123"
                           />
-                          {erroresTarjeta.cvv && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1.5 ml-1">{erroresTarjeta.cvv}</p>}
+                          {/* Se eliminó el <p> de errores inferior para tarjeta */}
                         </div>
                       </div>
                     </fieldset>

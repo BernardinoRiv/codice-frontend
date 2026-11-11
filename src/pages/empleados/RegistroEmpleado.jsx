@@ -34,6 +34,14 @@ const formatearDui = (valor = '') => {
   return digitos;
 };
 
+const formatearNit = (valor = '') => {
+  const digitos = extraerDigitos(valor).slice(0, 14);
+  if (digitos.length > 13) return `${digitos.slice(0, 4)}-${digitos.slice(4, 10)}-${digitos.slice(10, 13)}-${digitos.slice(13, 14)}`;
+  if (digitos.length > 10) return `${digitos.slice(0, 4)}-${digitos.slice(4, 10)}-${digitos.slice(10)}`;
+  if (digitos.length > 4) return `${digitos.slice(0, 4)}-${digitos.slice(4)}`;
+  return digitos;
+};
+
 const formatearTelefono = (valor = '') => {
   const digitos = extraerDigitos(valor).slice(0, 8);
   if (digitos.length > 4) {
@@ -80,6 +88,12 @@ const esCorreoValido = (correo) => {
   if (arroba <= 0) return false;
   const punto = limpio.lastIndexOf('.');
   return punto > arroba + 1 && punto < limpio.length - 1;
+};
+
+const calcularFechaMaxima = (edadMinima) => {
+  const hoy = new Date();
+  hoy.setFullYear(hoy.getFullYear() - edadMinima);
+  return hoy.toISOString().split('T')[0];
 };
 
 function SelectBuscador({
@@ -148,7 +162,7 @@ function SelectBuscador({
             if (!open) setSearch('');
           }
         }}
-        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
+        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
       >
         <span className={`truncate ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
           {seleccionado ? seleccionado.nombre : placeholder}
@@ -182,7 +196,8 @@ function SelectBuscador({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
                 autoFocus
-                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
+                /* CAMBIO: de text-xs a text-base para el input del buscador */
+                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-base focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
               />
               {(search || seleccionado) && (
                 <button
@@ -240,7 +255,7 @@ function SelectBuscador({
 function RegistroEmpleado() {
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
-  const [maxFechaNacimiento, setMaxFechaNacimiento] = useState('');
+  const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18));
 
   const [isVerifying, setIsVerifying] = useState(false);
   const [documentoVerificado, setDocumentoVerificado] = useState(false);
@@ -279,11 +294,31 @@ function RegistroEmpleado() {
 
   const esEmpleadoActivo = rolesActuales.some(r => typeof r === 'string' && r.toUpperCase().includes('EMPLEADO'));
 
+  const esTipoDui = () => {
+    if (String(formData.idTipoDocumento) === '1') return true;
+    const docOpt = catalogos.tiposDocumento?.find(d => String(d.id) === String(formData.idTipoDocumento));
+    return (docOpt?.nombre || '').toUpperCase().includes('DUI');
+  };
+
+  const esTipoNit = () => {
+    if (String(formData.idTipoDocumento) === '3') return true;
+    const docOpt = catalogos.tiposDocumento?.find(d => String(d.id) === String(formData.idTipoDocumento));
+    return (docOpt?.nombre || '').toUpperCase().includes('NIT');
+  };
+
   useEffect(() => {
-    const hoy = new Date();
-    hoy.setFullYear(hoy.getFullYear() - 18);
-    setMaxFechaNacimiento(hoy.toISOString().split('T')[0]);
-  }, []);
+    if (formData.idTipoDocumento && catalogos.tiposDocumento.length > 0) {
+      const edadMinima = esTipoDui() ? 18 : 15;
+      const maxFecha = calcularFechaMaxima(edadMinima);
+      setMaxFechaNacimiento(maxFecha);
+      
+      if (formData.fechaNacimiento && formData.fechaNacimiento > maxFecha) {
+        setFormData(prev => ({ ...prev, fechaNacimiento: '' }));
+      }
+    } else {
+      setMaxFechaNacimiento(calcularFechaMaxima(18));
+    }
+  }, [formData.idTipoDocumento, catalogos.tiposDocumento]);
 
   useEffect(() => {
     const fetchCatalogos = async () => {
@@ -337,12 +372,6 @@ function RegistroEmpleado() {
     fetchDistritos();
   }, [formData.idDepartamento]);
 
-  const esTipoDui = () => {
-    if (String(formData.idTipoDocumento) === '1') return true;
-    const docOpt = catalogos.tiposDocumento?.find(d => String(d.id) === String(formData.idTipoDocumento));
-    return (docOpt?.nombre || '').toUpperCase().includes('DUI');
-  };
-
   const handleReset = () => {
     toast.dismiss();
     setDocumentoVerificado(false);
@@ -382,9 +411,14 @@ function RegistroEmpleado() {
     setPersonaExistente(false);
     setRolesActuales([]);
 
-    const nuevoValor = esTipoDui()
-      ? formatearDui(valorInput)
-      : extraerAlfanumerico(valorInput).slice(0, 15); 
+    let nuevoValor = valorInput;
+    if (esTipoDui()) {
+      nuevoValor = formatearDui(valorInput);
+    } else if (esTipoNit()) {
+      nuevoValor = formatearNit(valorInput);
+    } else {
+      nuevoValor = extraerAlfanumerico(valorInput).slice(0, 15);
+    }
 
     setFormData(prev => ({ ...prev, numeroDocumento: nuevoValor }));
   };
@@ -414,10 +448,17 @@ function RegistroEmpleado() {
         return;
       }
       docParaEnviar = formatearDui(digitosDui);
+    } else if (esTipoNit()) {
+      const digitosNit = extraerDigitos(docParaEnviar);
+      if (digitosNit.length !== 14) {
+        toast.error('NIT incompleto', { description: 'Ingresa los 14 dígitos del NIT (formato 0000-000000-000-0).' });
+        return;
+      }
+      docParaEnviar = formatearNit(digitosNit);
     } else {
       const alfanum = extraerAlfanumerico(docParaEnviar);
       if (!esPasaporteValido(alfanum)) {
-        toast.error('Documento inválido', { description: 'Debe contener entre 6 y 15 caracteres alfanuméricos válidos.' });
+        toast.error('Documento inválido', { description: 'Debe contener entre 5 y 15 caracteres alfanuméricos válidos.' });
         return;
       }
       docParaEnviar = alfanum;
@@ -516,10 +557,14 @@ function RegistroEmpleado() {
 
   const documentoFormatoCompleto = esTipoDui()
     ? digitosDocActual.length === 9
-    : alfanumDocActual.length >= 5;
+    : esTipoNit()
+      ? digitosDocActual.length === 14
+      : alfanumDocActual.length >= 5;
 
   const docValido = documentoFormatoCompleto && (
-    esTipoDui() ? esDuiValido(digitosDocActual) : esPasaporteValido(alfanumDocActual)
+    esTipoDui() ? esDuiValido(digitosDocActual)
+    : esTipoNit() ? digitosDocActual.length === 14
+    : esPasaporteValido(alfanumDocActual)
   );
 
   const c1 = [
@@ -570,9 +615,18 @@ function RegistroEmpleado() {
       const token = localStorage.getItem('token');
       const endpoint = `${import.meta.env.VITE_API_URL}/api/v1/empleados`;
 
+      let docLimpio = formData.numeroDocumento.trim();
+      if (esTipoDui()) {
+        docLimpio = formatearDui(formData.numeroDocumento);
+      } else if (esTipoNit()) {
+        docLimpio = formatearNit(formData.numeroDocumento);
+      } else {
+        docLimpio = extraerAlfanumerico(formData.numeroDocumento);
+      }
+
       const payload = {
         idTipoDocumento: parseInt(formData.idTipoDocumento, 10),
-        numeroDocumento: esTipoDui() ? formatearDui(formData.numeroDocumento) : extraerAlfanumerico(formData.numeroDocumento),
+        numeroDocumento: docLimpio,
         nombres: formData.nombres.trim(),
         apellidos: formData.apellidos.trim(),
         fechaNacimiento: formData.fechaNacimiento,
@@ -701,7 +755,7 @@ function RegistroEmpleado() {
     </div>
   );
 
-  const inputClassName = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed";
+  const inputClassName = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed";
   const labelClassName = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
   const sectionTitleClassName = "text-[12px] font-extrabold text-slate-800 uppercase tracking-widest mb-5 pb-2 border-b border-slate-200 flex items-center gap-2";
 
@@ -774,13 +828,14 @@ function RegistroEmpleado() {
                             : 'bg-red-50 text-red-700'
                         }`}>
                           {docValido
-                            ? (esTipoDui() ? '✓ DUI auténtico' : '✓ Formato válido')
+                            ? (esTipoDui() ? '✓ DUI auténtico' : esTipoNit() ? '✓ Formato válido' : '✓ Formato válido')
                             : (esTipoDui() ? '✕ Dígito inválido' : '✕ Formato inválido')}
                         </span>
                       )}
                     </div>
                     <input
                       type="text"
+                      inputMode={esTipoDui() || esTipoNit() ? "numeric" : "text"}
                       value={formData.numeroDocumento}
                       onChange={(e) => handleNumeroDocumentoChange(e.target.value)}
                       onKeyDown={(e) => {
@@ -792,7 +847,7 @@ function RegistroEmpleado() {
                       required
                       disabled={!formData.idTipoDocumento || isVerifying}
                       className={`${inputClassName} ${!formData.idTipoDocumento ? 'bg-slate-100/50 cursor-not-allowed' : ''}`}
-                      placeholder={esTipoDui() ? '00000000-0' : 'Ej. A12345678'}
+                      placeholder={esTipoDui() ? '00000000-0' : esTipoNit() ? '0000-000000-000-0' : 'Ej. A12345678'}
                     />
                   </div>
 
@@ -863,7 +918,7 @@ function RegistroEmpleado() {
                   </div>
                   <div>
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
-                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">Fecha nacimiento</label>
                     </div>
                     <input
                       type="date"
@@ -957,7 +1012,7 @@ function RegistroEmpleado() {
                       required
                       disabled={!documentoVerificado || personaExistente}
                       rows="2"
-                      className="w-full bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed resize-none"
+                      className="w-full bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm placeholder-slate-500 disabled:bg-slate-100/50 disabled:text-slate-400 disabled:cursor-not-allowed resize-none"
                       placeholder="Colonia, pasaje, casa..."
                     />
                   </div>
