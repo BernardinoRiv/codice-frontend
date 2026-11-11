@@ -5,7 +5,6 @@ import { menuMaestro } from '../config/menuConfig';
 import apiInterceptor from '../services/apiInterceptor';
 import SessionGuard from './SessionGuard';
 
-
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,17 +17,19 @@ function DashboardLayout() {
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
-  // Estado para la foto obtenido directamente de la API
   const [urlFoto, setUrlFoto] = useState('');
+  
+  // Inicialización directa desde localStorage
+  const [codigoCiclo, setCodigoCiclo] = useState(() => {
+    return localStorage.getItem('codigoCiclo') || '...';
+  });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
 
-    // Cargar perfil al montar el layout para obtener la foto real
-    obtenerFotoPerfil();
+    obtenerDatosPerfilYCiclo();
 
-    // Escuchar el evento personalizado cuando se actualice la foto en Ajustes
     const handleFotoActualizada = (e) => {
       if (e.detail) setUrlFoto(e.detail);
     };
@@ -40,18 +41,30 @@ function DashboardLayout() {
     };
   }, []);
 
-  const obtenerFotoPerfil = async () => {
+  const obtenerDatosPerfilYCiclo = async () => {
     try {
       const response = await apiInterceptor('/api/v1/ajustes/perfil');
       if (response.ok) {
         const data = await response.json();
         if (data.urlFoto) {
           setUrlFoto(data.urlFoto);
-          localStorage.setItem('urlFoto', data.urlFoto); // Opcional por si acaso
+          localStorage.setItem('urlFoto', data.urlFoto); 
+        }
+      }
+
+      // Respaldo: Si no hay ciclo en localStorage, lo buscamos en la API
+      if (!localStorage.getItem('codigoCiclo') || localStorage.getItem('codigoCiclo') === 'undefined') {
+        const resCiclo = await apiInterceptor('/api/v1/ciclos/operativo-oferta');
+        if (resCiclo.ok) {
+           const dataCiclo = await resCiclo.json();
+           if(dataCiclo.codigoCiclo) {
+              setCodigoCiclo(dataCiclo.codigoCiclo);
+              localStorage.setItem('codigoCiclo', dataCiclo.codigoCiclo);
+           }
         }
       }
     } catch (error) {
-      console.error('Error al obtener la foto de perfil en el layout');
+      console.error('Error al obtener datos en el layout');
     }
   };
 
@@ -119,52 +132,54 @@ function DashboardLayout() {
         animate={currentVariant}
         variants={sidebarVariants}
         transition={{ duration: 0.4, type: "spring", bounce: 0.15 }}
-        className={`bg-white/95 backdrop-blur-xl border-r border-slate-200 flex flex-col justify-between h-full flex-shrink-0 shadow-sm overflow-hidden z-50
+        className={`bg-white/95 backdrop-blur-xl border-r border-slate-200 flex flex-col h-full flex-shrink-0 shadow-sm z-50
           ${isMobile ? 'fixed top-0 left-0 bottom-0' : 'relative'}
         `}
       >
-        <div className="overflow-y-auto overflow-x-hidden flex-1 flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <div className={`pt-8 pb-6 px-6 flex items-center ${visuallyMinimized ? 'justify-center px-0' : 'justify-between'}`}>
+        {/* ENCABEZADO DEL MENÚ */}
+        <div className={`pt-8 pb-6 px-6 flex items-center flex-shrink-0 ${visuallyMinimized ? 'justify-center px-0' : 'justify-between'}`}>
+          <AnimatePresence mode="wait">
+            {!visuallyMinimized && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}
+                className="whitespace-nowrap flex flex-col"
+              >
+                <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none">Codice</h1>
+                <span className="inline-flex items-center mt-2 px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-extrabold rounded-md tracking-widest uppercase w-max border border-slate-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                  CICLO {codigoCiclo} 
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button 
+            onClick={handleSidebarAction}
+            aria-label={isMobile ? "Cerrar menú" : isMinimized ? "Expandir menú" : "Contraer menú"}
+            disabled={isAnimating && !isMobile}
+            className={`cursor-pointer text-slate-400 hover:text-slate-900 hover:bg-slate-100 flex-shrink-0 rounded-full w-8 h-8 flex items-center justify-center transition-colors ${(isAnimating && !isMobile) ? 'opacity-50' : ''}`}
+          >
             <AnimatePresence mode="wait">
-              {!visuallyMinimized && (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}
-                  className="whitespace-nowrap flex flex-col"
-                >
-                  <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight leading-none">Codice</h1>
-                  <span className="inline-flex items-center mt-1.5 px-2 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-extrabold rounded-md tracking-widest uppercase w-max border border-slate-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                    Ciclo 02-2026
-                  </span>
+              {isMobile ? (
+                <motion.div key="close" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </motion.div>
+              ) : visuallyMinimized ? (
+                <motion.div key="arrow" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5" /></svg>
+                </motion.div>
+              ) : (
+                <motion.div key="hamburger" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
                 </motion.div>
               )}
             </AnimatePresence>
+          </button>
+        </div>
 
-            <button 
-              onClick={handleSidebarAction}
-              aria-label={isMobile ? "Cerrar menú" : isMinimized ? "Expandir menú" : "Contraer menú"}
-              disabled={isAnimating && !isMobile}
-              className={`cursor-pointer text-slate-400 hover:text-slate-900 hover:bg-slate-100 flex-shrink-0 rounded-full w-8 h-8 flex items-center justify-center transition-colors ${(isAnimating && !isMobile) ? 'opacity-50' : ''}`}
-            >
-              <AnimatePresence mode="wait">
-                {isMobile ? (
-                  <motion.div key="close" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </motion.div>
-                ) : visuallyMinimized ? (
-                  <motion.div key="arrow" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5" /></svg>
-                  </motion.div>
-                ) : (
-                  <motion.div key="hamburger" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </button>
-          </div>
-
-          <nav className={`mt-2 flex flex-col space-y-1.5 ${visuallyMinimized ? 'px-3' : 'px-4'}`}>
+        {/* CONTENEDOR DE NAVEGACIÓN (Con scroll interno) */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <nav className={`mt-2 flex flex-col space-y-1.5 pb-4 ${visuallyMinimized ? 'px-3' : 'px-4'}`}>
             {navItems.map((item) => {
               const isActive = location.pathname.includes(item.path);
               return (
@@ -195,11 +210,11 @@ function DashboardLayout() {
           </nav>
         </div>
 
-        <div className="p-4">
+        {/* TARJETA DE USUARIO (Fija abajo) */}
+        <div className="p-4 flex-shrink-0 bg-white border-t border-slate-100">
           <div className={`bg-slate-50 border border-slate-200 rounded-[20px] transition-all duration-300 ${visuallyMinimized ? 'p-2' : 'p-4'}`}>
             <div className={`flex items-center ${visuallyMinimized ? 'justify-center' : 'space-x-3 mb-4'}`}>
               
-              {/* Avatar: Muestra la foto de la API si existe, sino la inicial */}
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-200 border border-white shadow-sm flex items-center justify-center font-extrabold text-slate-800 text-lg overflow-hidden">
                 {urlFoto ? (
                   <img src={`${import.meta.env.VITE_API_URL}${urlFoto}`} alt="Perfil" className="w-full h-full object-cover" />
@@ -255,7 +270,6 @@ function DashboardLayout() {
           </header>
         )}
 
-        {/* Un solo scroll para el contenido y el footer. */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="min-h-full flex flex-col px-4 pt-5 md:px-8 md:pt-8">
             <motion.div

@@ -4,11 +4,11 @@ import { toast } from 'sonner';
 const EstadoCuentaEstudiante = () => {
   const [ciclos, setCiclos] = useState([]);
   const [cicloSeleccionado, setCicloSeleccionado] = useState('');
-  
+
   const [datosCuenta, setDatosCuenta] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [pestanaActiva, setPestanaActiva] = useState('pendientes');
-  
+
   // Variables de sesión
   const [carnetEstudiante, setCarnetEstudiante] = useState(null);
   const [idEstudiante, setIdEstudiante] = useState(null);
@@ -35,7 +35,7 @@ const EstadoCuentaEstudiante = () => {
       try {
         const payload = JSON.parse(window.atob(token.split('.')[1]));
         if (payload.carnet) {
-            setCarnetEstudiante(payload.carnet);
+          setCarnetEstudiante(payload.carnet);
         }
       } catch (error) {
         toast.error("Sesión inválida.");
@@ -46,7 +46,7 @@ const EstadoCuentaEstudiante = () => {
   // Cargar ciclos solo cuando ya tenemos el carnet del estudiante
   useEffect(() => {
     if (carnetEstudiante) {
-        cargarCiclosDisponibles();
+      cargarCiclosDisponibles();
     }
   }, [carnetEstudiante]);
 
@@ -66,7 +66,7 @@ const EstadoCuentaEstudiante = () => {
       if (res.ok) {
         const ciclosEstudiante = await res.json();
         setCiclos(ciclosEstudiante);
-        
+
         if (ciclosEstudiante.length > 0) {
           setCicloSeleccionado(ciclosEstudiante[0].idCiclo);
         } else {
@@ -88,7 +88,7 @@ const EstadoCuentaEstudiante = () => {
       });
 
       if (!response.ok) throw new Error('No se encontraron movimientos financieros para este ciclo.');
-      
+
       const data = await response.json();
       if (data.cargosPendientes && data.cargosPendientes.length > 0) {
         data.cargosPendientes.sort((a, b) => new Date(a.fechaVencimiento) - new Date(b.fechaVencimiento));
@@ -109,7 +109,7 @@ const EstadoCuentaEstudiante = () => {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/${idPago}/comprobante`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const fileUrl = URL.createObjectURL(blob);
@@ -139,8 +139,8 @@ const EstadoCuentaEstudiante = () => {
     const matches = v.match(/\d{4,16}/g);
     const match = matches && matches[0] || ''
     let parts = []
-    for (let i=0, len=match.length; i<len; i+=4) {
-      parts.push(match.substring(i, i+4))
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4))
     }
     if (parts.length) { return parts.join(' ') } else { return value }
   };
@@ -159,40 +159,40 @@ const EstadoCuentaEstudiante = () => {
     setIsProcessing(true);
     try {
       const token = localStorage.getItem('token');
-      
+
       const idValido = Number(datosCuenta.estudiante.idEstudiante || idEstudiante);
-      
+
       if (!idValido || isNaN(idValido)) {
-          throw new Error("No se pudo identificar tu usuario. Por favor, cierra sesión y vuelve a entrar.");
+        throw new Error("No se pudo identificar tu usuario. Por favor, cierra sesión y vuelve a entrar.");
       }
 
       const payload = {
         idEstudiante: idValido,
-        idsCargosAPagar: selectedCargos, 
-        arancelesAdicionales: [], 
-        montoRecibido: Number(totalAPagar.toFixed(2)), 
-        idMetodoPago: 2, 
+        idsCargosAPagar: selectedCargos,
+        arancelesAdicionales: [],
+        montoRecibido: Number(totalAPagar.toFixed(2)),
+        idMetodoPago: 2,
         numeroReferencia: `ONL-${Date.now().toString().slice(-6)}`
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/pagos/en-linea`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
-          throw new Error(data.error || data.mensaje || data.message || 'El servidor rechazó el pago (Error 400)');
+        throw new Error(data.error || data.mensaje || data.message || 'El servidor rechazó el pago (Error 400)');
       }
 
       setPagoExitoso(true);
       toast.success('¡Pago completado!', { description: `Factura generada: ${data.factura}. Revisa tu correo.` });
-      
+
       setTimeout(() => {
         setPagoExitoso(false);
         setShowModalPago(false);
@@ -212,7 +212,7 @@ const EstadoCuentaEstudiante = () => {
 
   return (
     <div className="w-full pb-32 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
       {/* MODAL DE PAGO EN LÍNEA */}
       {showModalPago && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -226,12 +226,12 @@ const EstadoCuentaEstudiante = () => {
                 ✕
               </button>
             </div>
-            
+
             <form onSubmit={handleProcesarPagoOnline} className="p-6 space-y-4">
               <div className="w-full h-40 bg-gradient-to-tr from-slate-900 to-slate-700 rounded-2xl p-5 text-white flex flex-col justify-between shadow-lg relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                 <div className="flex justify-between items-start">
-                  <svg className="w-10 h-8 opacity-80" viewBox="0 0 36 24" fill="none"><path d="M4 0C1.79086 0 0 1.79086 0 4V20C0 22.2091 1.79086 24 4 24H32C34.2091 24 36 22.2091 36 20V4C36 1.79086 34.2091 0 32 0H4Z" fill="white"/><path d="M4 4H32V8H4V4Z" fill="currentColor"/><path d="M4 12H12V16H4V12Z" fill="currentColor"/><path d="M16 12H24V16H16V12Z" fill="currentColor"/></svg>
+                  <svg className="w-10 h-8 opacity-80" viewBox="0 0 36 24" fill="none"><path d="M4 0C1.79086 0 0 1.79086 0 4V20C0 22.2091 1.79086 24 4 24H32C34.2091 24 36 22.2091 36 20V4C36 1.79086 34.2091 0 32 0H4Z" fill="white" /><path d="M4 4H32V8H4V4Z" fill="currentColor" /><path d="M4 12H12V16H4V12Z" fill="currentColor" /><path d="M16 12H24V16H16V12Z" fill="currentColor" /></svg>
                   <span className="font-mono tracking-widest text-xs opacity-70">Tarjeta crédito/débito</span>
                 </div>
                 <div>
@@ -245,23 +245,23 @@ const EstadoCuentaEstudiante = () => {
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Titular de la tarjeta</label>
-                <input type="text" required value={tarjeta.titular} onChange={(e) => setTarjeta({...tarjeta, titular: e.target.value.toUpperCase()})} placeholder="Nombre tal como aparece en la tarjeta" className={`${inputClass} font-sans`} />
+                <input type="text" required value={tarjeta.titular} onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value.toUpperCase() })} placeholder="Nombre tal como aparece en la tarjeta" className={`${inputClass} font-sans`} />
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Número de tarjeta</label>
-                <input type="text" required maxLength="19" value={tarjeta.numero} onChange={(e) => setTarjeta({...tarjeta, numero: formatCardNumber(e.target.value)})} placeholder="0000 0000 0000 0000" className={inputClass} />
+                <input type="text" required maxLength="19" value={tarjeta.numero} onChange={(e) => setTarjeta({ ...tarjeta, numero: formatCardNumber(e.target.value) })} placeholder="0000 0000 0000 0000" className={inputClass} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Vencimiento</label>
                   <div className="flex gap-2">
-                    <select required value={tarjeta.mes} onChange={(e) => setTarjeta({...tarjeta, mes: e.target.value})} className={`${inputClass} px-2 appearance-none`}>
+                    <select required value={tarjeta.mes} onChange={(e) => setTarjeta({ ...tarjeta, mes: e.target.value })} className={`${inputClass} px-2 appearance-none`}>
                       <option value="" disabled>Mes</option>
-                      {Array.from({length: 12}, (_, i) => (i + 1).toString().padStart(2, '0')).map(m => <option key={m} value={m}>{m}</option>)}
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    <select required value={tarjeta.anio} onChange={(e) => setTarjeta({...tarjeta, anio: e.target.value})} className={`${inputClass} px-2 appearance-none`}>
+                    <select required value={tarjeta.anio} onChange={(e) => setTarjeta({ ...tarjeta, anio: e.target.value })} className={`${inputClass} px-2 appearance-none`}>
                       <option value="" disabled>Año</option>
                       {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
@@ -269,14 +269,14 @@ const EstadoCuentaEstudiante = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Cvv</label>
-                  <input type="password" required maxLength="4" value={tarjeta.cvv} onChange={(e) => setTarjeta({...tarjeta, cvv: e.target.value.replace(/\D/g, '')})} placeholder="•••" className={inputClass} />
+                  <input type="password" required maxLength="4" value={tarjeta.cvv} onChange={(e) => setTarjeta({ ...tarjeta, cvv: e.target.value.replace(/\D/g, '') })} placeholder="•••" className={inputClass} />
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100">
                 <button type="submit" disabled={isProcessing || pagoExitoso} className="w-full bg-black text-white py-4 rounded-xl font-bold transition-all flex items-center justify-center disabled:opacity-70">
                   {pagoExitoso ? (
-                     <><span className="text-emerald-400 mr-2">✓</span> ¡Transacción aprobada!</>
+                    <><span className="text-emerald-400 mr-2">✓</span> ¡Transacción aprobada!</>
                   ) : isProcessing ? (
                     <span className="animate-pulse">Procesando pago...</span>
                   ) : (
@@ -305,13 +305,13 @@ const EstadoCuentaEstudiante = () => {
               </p>
             </div>
           </div>
-          
+
           <div className="w-full md:w-64">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
               Ciclo a consultar
             </label>
             <div className="relative">
-              <select 
+              <select
                 value={cicloSeleccionado}
                 onChange={(e) => setCicloSeleccionado(e.target.value)}
                 className="w-full h-[50px] bg-white text-slate-900 border border-slate-200 rounded-xl px-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm appearance-none cursor-pointer"
@@ -369,12 +369,12 @@ const EstadoCuentaEstudiante = () => {
                     <div className="overflow-x-auto p-2">
                       {datosCuenta.cargosPendientes.map((cargo, index) => {
                         const isSelected = selectedCargos.includes(cargo.idCargo);
-                        
+
                         return (
                           <label key={`${cargo.idCargo}-${index}`} className={`flex items-center p-4 border rounded-xl mb-2 transition-all duration-200 cursor-pointer ${isSelected ? 'border-black bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                             <div className="mr-4">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 checked={isSelected}
                                 onChange={(e) => toggleCargoSelection(index, e.target.checked)}
                                 className="w-5 h-5 text-black border-slate-300 rounded focus:ring-black cursor-pointer"
@@ -385,7 +385,7 @@ const EstadoCuentaEstudiante = () => {
                                 <h4 className="font-bold text-slate-900">{cargo.concepto}</h4>
                                 <p className="text-xs text-slate-500 mt-0.5">{cargo.mes} Vence: {cargo.fechaVencimiento}</p>
                               </div>
-                              
+
                               <div className="text-right">
                                 <span className="font-extrabold text-lg text-slate-900">${cargo.monto.toFixed(2)}</span>
                                 {cargo.montoRecargo > 0 && (
@@ -408,35 +408,38 @@ const EstadoCuentaEstudiante = () => {
                   {datosCuenta.historialPagos.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 font-medium">Aún no se registran pagos en este ciclo.</div>
                   ) : (
-                    <table className="w-full text-left text-[13px]">
-                      <thead className="bg-emerald-50 text-[10px] uppercase tracking-widest text-emerald-700 font-bold border-b border-emerald-100">
-                        <tr>
-                          <th className="px-6 py-4">N° recibo</th>
-                          <th className="px-6 py-4">Fecha pago</th>
-                          <th className="px-6 py-4">Concepto cancelado</th>
-                          <th className="px-6 py-4 text-right">Monto pagado</th>
-                          <th className="px-6 py-4 text-center">Factura</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {datosCuenta.historialPagos.map((pago) => (
-                          <tr key={pago.idPago} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-mono font-bold text-slate-500">{pago.numeroRecibo}</td>
-                            <td className="px-6 py-4 text-slate-600 font-medium">{pago.fechaPago}</td>
-                            <td className="px-6 py-4 font-bold text-slate-900">{pago.concepto}</td>
-                            <td className="px-6 py-4 text-right font-extrabold text-emerald-700">${pago.montoPagado.toFixed(2)}</td>
-                            <td className="px-6 py-4 text-center">
-                              <button 
-                                onClick={() => verFacturaEnOtraPestana(pago.idPago)}
-                                className="px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
-                              >
-                                Ver factura
-                              </button>
-                            </td>
+                    // AÑADIR ESTE DIV CONTENEDOR
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-[13px] min-w-[600px]"> {/* Añadido min-w-[600px] para asegurar un ancho mínimo */}
+                        <thead className="bg-emerald-50 text-[10px] uppercase tracking-widest text-emerald-700 font-bold border-b border-emerald-100">
+                          <tr>
+                            <th className="px-6 py-4">N° recibo</th>
+                            <th className="px-6 py-4">Fecha pago</th>
+                            <th className="px-6 py-4">Concepto cancelado</th>
+                            <th className="px-6 py-4 text-right">Monto pagado</th>
+                            <th className="px-6 py-4 text-center">Factura</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {datosCuenta.historialPagos.map((pago) => (
+                            <tr key={pago.idPago} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{pago.numeroRecibo}</td>
+                              <td className="px-6 py-4 text-slate-600 font-medium whitespace-nowrap">{pago.fechaPago}</td>
+                              <td className="px-6 py-4 font-bold text-slate-900 min-w-[200px]">{pago.concepto}</td>
+                              <td className="px-6 py-4 text-right font-extrabold text-emerald-700 whitespace-nowrap">${pago.montoPagado.toFixed(2)}</td>
+                              <td className="px-6 py-4 text-center whitespace-nowrap">
+                                <button
+                                  onClick={() => verFacturaEnOtraPestana(pago.idPago)}
+                                  className="px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
+                                >
+                                  Ver factura
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div> // CERRAR EL DIV CONTENEDOR
                   )}
                 </div>
               )}
