@@ -55,7 +55,10 @@ function Login() {
       localStorage.setItem('rol', data.rol);
       localStorage.setItem('ultimoAcceso', data.ultimoAcceso);
 
-      // Evaluación del primer inicio de sesión con validación estricta
+      if (data.codigoCiclo) {
+        localStorage.setItem('codigoCiclo', data.codigoCiclo);
+      }
+
       if (!data.ultimoAcceso || String(data.ultimoAcceso) === 'null' || String(data.ultimoAcceso) === 'undefined') {
         toast.info('Primer ingreso detectado', {
           description: 'Por seguridad institucional, debes cambiar tu contraseña.'
