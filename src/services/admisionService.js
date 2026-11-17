@@ -164,17 +164,88 @@ export const admisionService = {
         codigo,
       }),
     }),
+
+  // ==========================================================
+  // VERIFICACIÓN DE CORREO PARA ASPIRANTES NUEVOS
+  // ==========================================================
+
+  solicitarCodigoCorreoNuevo: (
+    idTipoDocumento,
+    numeroDocumento,
+    correoPersonal,
+    nombres,
+  ) =>
+    request("/api/v1/public/admision-online/solicitar-codigo-correo-nuevo", {
+      method: "POST",
+      body: JSON.stringify({
+        idTipoDocumento: Number(idTipoDocumento),
+        numeroDocumento: numeroDocumento.trim(),
+        correoPersonal: correoPersonal.trim().toLowerCase(),
+        nombres: nombres.trim(),
+      }),
+    }),
+
+  verificarCodigoCorreoNuevo: (
+    idTipoDocumento,
+    numeroDocumento,
+    correoPersonal,
+    codigo,
+  ) =>
+    request("/api/v1/public/admision-online/verificar-codigo-correo-nuevo", {
+      method: "POST",
+      body: JSON.stringify({
+        idTipoDocumento: Number(idTipoDocumento),
+        numeroDocumento: numeroDocumento.trim(),
+        correoPersonal: correoPersonal.trim().toLowerCase(),
+        codigo: codigo.trim(),
+      }),
+    }),
+
+  // Consulta los aranceles sin crear una prematrícula.
+  consultarPlanFinanciero: (options) =>
+    request("/api/v1/public/admision-online/plan-financiero", options),
+
   procesarPreMatricula: (payload) =>
     request("/api/v1/public/admision-online/pre-matricular", {
       method: "POST",
       body: JSON.stringify(payload),
       timeoutMs: 45000,
     }),
-  generarBoletaNpe: (id) =>
-    request(
-      `/api/v1/public/admision-online/${encodeURIComponent(id)}/generar-boleta-npe`,
-      { method: "POST", timeoutMs: 45000 },
-    ),
+  generarBoletaNpe: async (idMatricula, tokenVerificacion) => {
+    if (!idMatricula || !tokenVerificacion) {
+      throw new Error("Se requiere una matrícula y una identidad verificada.");
+    }
+
+    return await request(
+      `/api/v1/public/admision-online/${encodeURIComponent(idMatricula)}/generar-boleta-npe`,
+      {
+        method: "POST",
+        headers: {
+          "X-Admision-Token": tokenVerificacion,
+        },
+      },
+    );
+  },
+
+  consultarEstadoSolicitud: (idMatricula, tokenVerificacion) => {
+    if (!idMatricula || !tokenVerificacion) {
+      throw new AdmisionError(
+        "Debes verificar tu identidad para consultar la solicitud.",
+        { kind: "validation" },
+      );
+    }
+
+    return request(
+      `/api/v1/public/admision-online/${encodeURIComponent(idMatricula)}/estado-solicitud`,
+      {
+        method: "GET",
+        headers: {
+          "X-Admision-Token": tokenVerificacion,
+        },
+      },
+    );
+  },
+
   cancelarPreMatricula: (id) =>
     request(
       `/api/v1/public/admision-online/cancelar/${encodeURIComponent(id)}`,
