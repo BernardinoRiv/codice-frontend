@@ -6,6 +6,7 @@ function VentanillaPagos() {
   const [isSearching, setIsSearching] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pagoExitoso, setPagoExitoso] = useState(false);
+  const [ultimoPagoRegistrado, setUltimoPagoRegistrado] = useState(null);
 
   const [showModalArancel, setShowModalArancel] = useState(false);
   const [searchArancel, setSearchArancel] = useState(''); 
@@ -20,11 +21,11 @@ function VentanillaPagos() {
   const [metodoPago, setMetodoPago] = useState('1');
   const [referencia, setReferencia] = useState('');
 
-  // ESTADOS PARA LA ZONA ROJA (Historial de hoy)
+  // Historial de hoy
   const [pagosHoy, setPagosHoy] = useState([]);
   const [cargandoHoy, setCargandoHoy] = useState(false);
+  const [reenviandoId, setReenviandoId] = useState(null);
 
-  // Cargar pagos de hoy al iniciar el componente
   useEffect(() => {
     cargarPagosDeHoy();
   }, []);
@@ -33,7 +34,6 @@ function VentanillaPagos() {
     setCargandoHoy(true);
     try {
       const token = localStorage.getItem('token');
-      // Obtenemos la fecha actual en formato YYYY-MM-DD
       const fechaHoy = new Date().toLocaleDateString('en-CA'); 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/historial?fecha=${fechaHoy}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -49,7 +49,6 @@ function VentanillaPagos() {
     }
   };
 
-  // Función corregida para evitar el "Invalid time value"
   const formatearFecha = (fechaValor) => {
     if (!fechaValor) return 'Sin fecha';
     try {
@@ -76,7 +75,30 @@ function VentanillaPagos() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
 
+  const verFacturaPDF = async (idPago) => {
+    if (!idPago) return;
+    const toastId = toast.loading('Generando factura PDF...');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/${idPago}/comprobante`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const fileUrl = URL.createObjectURL(blob);
+        window.open(fileUrl, '_blank');
+        toast.success('Factura abierta', { id: toastId });
+      } else {
+        toast.error('No se pudo generar el PDF de la factura', { id: toastId });
+      }
+    } catch (error) {
+      toast.error('Error de conexión al generar PDF', { id: toastId });
+    }
+  };
+
   const reenviarComprobanteEmail = async (idPago) => {
+    setReenviandoId(idPago);
     const toastId = toast.loading('Enviando correo...');
     try {
       const token = localStorage.getItem('token');
@@ -85,21 +107,21 @@ function VentanillaPagos() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
         toast.success(data.mensaje || 'Correo enviado exitosamente', { id: toastId });
       } else {
-        toast.error(data.error || 'Error al enviar correo', { id: toastId });
+        toast.error(data.mensaje || data.error || data.message || 'Error al enviar correo', { id: toastId });
       }
     } catch (error) {
       toast.error('Error de conexión con el servidor', { id: toastId });
+    } finally {
+      setReenviandoId(null);
     }
   };
 
   const abrirModalYObtenerAranceles = async () => {
     setShowModalArancel(true);
-    if (catalogoAranceles.length > 0) return;
-
     setCargandoCatalogo(true);
     try {
       const token = localStorage.getItem('token');
@@ -131,6 +153,7 @@ function VentanillaPagos() {
     setCargosObligatorios([]); 
     setArancelesAgregados([]); 
     setPagoExitoso(false);
+    setUltimoPagoRegistrado(null);
 
     try {
       const token = localStorage.getItem('token');
@@ -193,7 +216,7 @@ function VentanillaPagos() {
 
   const handleAgregarArancel = (arancel) => {
     if (arancelesAgregados.some(a => a.idConcepto === arancel.idConcepto)) {
-      return toast.error('Arancel duplicado', { description: `El arancel ya está en la lista.` });
+      return toast.error('Arancel duplicado', { description: 'El arancel ya está en la lista.' });
     }
     setArancelesAgregados(prev => [...prev, { ...arancel, idTemporal: Date.now() }]);
     toast.success('Arancel agregado', { description: `Se añadió: ${arancel.nombre}` });
@@ -243,12 +266,15 @@ function VentanillaPagos() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.mensaje || 'Error al procesar el cobro');
+      if (!response.ok) throw new Error(data.error || data.mensaje || data.message || 'Error al procesar el cobro');
 
       toast.success('Cobro exitoso', { description: `Factura generada: ${data.factura}` });
       setPagoExitoso(true);
+      setUltimoPagoRegistrado({
+        idPago: data.idPago,
+        factura: data.factura
+      });
       
-      // Recargar pagos del día para que aparezca abajo instantáneamente
       cargarPagosDeHoy();
       
       setTimeout(() => {
@@ -260,7 +286,8 @@ function VentanillaPagos() {
         setMetodoPago('1');
         setReferencia('');
         setPagoExitoso(false);
-      }, 4000);
+        setUltimoPagoRegistrado(null);
+      }, 6000);
 
     } catch (error) {
       toast.error('Error en el cobro', { description: error.message });
@@ -406,6 +433,17 @@ function VentanillaPagos() {
                   {isProcessing && !pagoExitoso && <span className="absolute inset-0 flex items-center justify-center bg-black text-xs animate-pulse font-bold tracking-widest text-gray-300">PROCESANDO...</span>}
                   {pagoExitoso && <span className="absolute inset-0 flex items-center justify-center bg-[#2E7D32] text-white font-bold tracking-widest">¡Pago registrado!</span>}
                 </button>
+
+                {pagoExitoso && ultimoPagoRegistrado?.idPago && (
+                  <button
+                    type="button"
+                    onClick={() => verFacturaPDF(ultimoPagoRegistrado.idPago)}
+                    className="mt-3 w-full py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-[14px] text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Ver / Imprimir Factura ({ultimoPagoRegistrado.factura})
+                  </button>
+                )}
               </>
             ) : (
               <div className="text-center py-16 opacity-50 flex flex-col items-center">
@@ -417,9 +455,7 @@ function VentanillaPagos() {
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* ZONA ROJA: HISTORIAL DE PAGOS DEL DÍA ACTUAL (Sin Pestañas) */}
-      {/* ========================================================= */}
+      {/* HISTORIAL DE PAGOS DEL DÍA ACTUAL */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
           <div>
@@ -448,33 +484,54 @@ function VentanillaPagos() {
                   <th className="px-4 py-3">Estudiante</th>
                   <th className="px-4 py-3">Hora</th>
                   <th className="px-4 py-3 text-right">Monto</th>
-                  <th className="px-4 py-3 text-center">Reenviar PDF</th>
+                  <th className="px-4 py-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {pagosHoy.map((pago) => (
-                  <tr key={pago.idPago} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-gray-900">{pago.referencia}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-gray-900">{pago.nombreEstudiante}</p>
-                      <p className="text-xs text-gray-500 font-mono">{pago.carnet}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{formatearFecha(pago.fechaPago)}</td>
-                    <td className="px-4 py-3 text-right font-extrabold text-[#2E7D32]">
-                      {formatCurrency(pago.montoTotal)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button 
-                        onClick={() => reenviarComprobanteEmail(pago.idPago)}
-                        title="Reenviar comprobante por correo"
-                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 text-xs font-bold rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1 mx-auto shadow-sm"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        Reenviar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {pagosHoy.map((pago) => {
+                  const facturaMostrar = pago.numeroFactura || pago.referencia;
+                  const mostrarRefSecundaria = pago.numeroFactura && pago.referencia && pago.numeroFactura !== pago.referencia;
+
+                  return (
+                    <tr key={pago.idPago} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-mono font-bold text-gray-900">{facturaMostrar}</p>
+                        {mostrarRefSecundaria && (
+                          <p className="text-[11px] text-gray-400 font-mono mt-0.5">Ref: {pago.referencia}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-900">{pago.nombreEstudiante}</p>
+                        <p className="text-xs text-gray-500 font-mono">{pago.carnet}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{formatearFecha(pago.fechaPago)}</td>
+                      <td className="px-4 py-3 text-right font-extrabold text-[#2E7D32]">
+                        {formatCurrency(pago.montoTotal)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="inline-flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => verFacturaPDF(pago.idPago)}
+                            title="Abrir o descargar factura PDF"
+                            className="px-3 py-1.5 bg-black text-white text-xs font-bold rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            Ver PDF
+                          </button>
+                          <button 
+                            onClick={() => reenviarComprobanteEmail(pago.idPago)}
+                            disabled={reenviandoId === pago.idPago}
+                            title="Reenviar comprobante por correo"
+                            className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 text-xs font-bold rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            {reenviandoId === pago.idPago ? 'Enviando...' : 'Reenviar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -483,8 +540,7 @@ function VentanillaPagos() {
 
       {showModalArancel && (
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-           {/* ... Modal del Catálogo (exactamente igual que antes) ... */}
-           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Agregar Arancel Extra</h3>
@@ -495,12 +551,18 @@ function VentanillaPagos() {
               <input type="text" placeholder="Buscar arancel..." value={searchArancel} onChange={(e) => setSearchArancel(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm focus:ring-black focus:border-black outline-none"/>
             </div>
             <div className="p-4 max-h-[50vh] overflow-y-auto bg-gray-50/30">
-              {arancelesFiltrados.map((arancel) => (
-                <button key={arancel.idConcepto} onClick={() => handleAgregarArancel(arancel)} className="w-full flex items-center justify-between p-4 mb-2 bg-white border border-gray-200 hover:border-black rounded-2xl transition-all">
-                  <span className="font-semibold text-[13px] text-gray-700">{arancel.nombre}</span>
-                  <span className="font-bold text-[#2E7D32]">{formatCurrency(arancel.monto)}</span>
-                </button>
-              ))}
+              {cargandoCatalogo ? (
+                <div className="py-8 text-center text-xs text-gray-400">Cargando aranceles disponibles...</div>
+              ) : arancelesFiltrados.length === 0 ? (
+                <div className="py-8 text-center text-xs text-gray-400">No se encontraron aranceles activos.</div>
+              ) : (
+                arancelesFiltrados.map((arancel) => (
+                  <button key={arancel.idConcepto} onClick={() => handleAgregarArancel(arancel)} className="w-full flex items-center justify-between p-4 mb-2 bg-white border border-gray-200 hover:border-black rounded-2xl transition-all">
+                    <span className="font-semibold text-[13px] text-gray-700">{arancel.nombre}</span>
+                    <span className="font-bold text-[#2E7D32]">{formatCurrency(arancel.monto)}</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>

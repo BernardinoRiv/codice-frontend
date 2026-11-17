@@ -321,6 +321,51 @@ const IngresoNotas = () => {
     inputArchivoRef.current?.click();
   };
 
+  // Valida la celda cruda de SheetJS para detectar fórmulas, texto o rangos inválidos
+  const inspeccionarCeldaExcel = (hoja, rowIndex0Based, colIndex0Based) => {
+    const address = XLSX.utils.encode_cell({ r: rowIndex0Based, c: colIndex0Based });
+    const rawCell = hoja[address];
+
+    if (!rawCell || rawCell.t === 'z' || rawCell.v === undefined || rawCell.v === null || String(rawCell.v).trim() === '') {
+      return { tipo: 'vacio', valorMostrar: null, motivoError: null };
+    }
+
+    if (rawCell.f) {
+      return {
+        tipo: 'invalido',
+        valorMostrar: `=${rawCell.f}`,
+        motivoError: 'No se permiten fórmulas en las celdas de notas.'
+      };
+    }
+
+    if (rawCell.t !== 'n') {
+      return {
+        tipo: 'invalido',
+        valorMostrar: String(rawCell.w || rawCell.v),
+        motivoError: 'El valor debe ser numérico (no texto ni fecha).'
+      };
+    }
+
+    const numVal = Number(rawCell.v);
+    if (isNaN(numVal) || numVal < 0 || numVal > 10) {
+      return {
+        tipo: 'invalido',
+        valorMostrar: String(numVal),
+        motivoError: 'La nota debe estar entre 0.0 y 10.0.'
+      };
+    }
+
+    if (Math.abs(Math.round(numVal * 10) - numVal * 10) > 1e-6) {
+      return {
+        tipo: 'invalido',
+        valorMostrar: String(numVal),
+        motivoError: 'Solo se permite máximo 1 decimal.'
+      };
+    }
+
+    return { tipo: 'valido', valorNumerico: numVal, valorMostrar: numVal.toFixed(1), motivoError: null };
+  };
+
   const handleArchivoSeleccionado = (e) => {
     const archivo = e.target.files?.[0];
     if (!archivo) return;
@@ -336,7 +381,7 @@ const IngresoNotas = () => {
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellFormula: true });
         const primerHoja = workbook.Sheets[workbook.SheetNames[0]];
         const datosJson = XLSX.utils.sheet_to_json(primerHoja, { header: 1 });
 
@@ -367,7 +412,7 @@ const IngresoNotas = () => {
         const mapaEvaluaciones = {};
         for (let i = 2; i < primeraFila.length; i++) {
           const encabezado = primeraFila[i]?.toString().toUpperCase().trim() || '';
-          const partes = encabezado.split(' ');
+          const partes = encabezado.split(/\s+/);
           const tipo = partes[0];
           const numero = partes[1];
           
@@ -393,77 +438,90 @@ const IngresoNotas = () => {
           return;
         }
 
-        const filasDatos = datosJson.slice(1).filter(fila => fila && fila.length > 0);
-        if (filasDatos.length === 0) {
+        // Conservamos el índice real de fila en Excel (r = idx + 1)
+        const filasConIndice = [];
+        for (let r = 1; r < datosJson.length; r++) {
+          const fila = datosJson[r];
+          if (fila && fila.length > 0 && fila[0] !== undefined && fila[0] !== null && String(fila[0]).trim() !== '') {
+            filasConIndice.push({ r, fila });
+          }
+        }
+
+        if (filasConIndice.length === 0) {
           toast.error('Archivo vacío', { description: 'No se encontraron registros de estudiantes.' });
           e.target.value = '';
           return;
         }
 
         const columnasConCambios = columnasActivas.filter(col => {
-           return filasDatos.some(fila => {
-              const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
-              const inscripcionEst = inscripciones.find(i => i.carnet.toLowerCase() === carnetStr);
-              if (!inscripcionEst) return false;
+          return filasConIndice.some(({ r, fila }) => {
+            const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
+            const inscripcionEst = inscripciones.find(i => i.carnet.toLowerCase() === carnetStr);
+            if (!inscripcionEst) return false;
 
-              const excelVal = fila[col.indiceColumna];
-              const tieneValorExcel = excelVal !== undefined && excelVal !== null && excelVal !== '';
-              
-              const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
-              const califActual = calificaciones[califKey];
-              
-              if (califActual && califActual.estadoCalificacion === 'PUBLICADA') return false; 
+            const inspeccion = inspeccionarCeldaExcel(primerHoja, r, col.indiceColumna);
+            if (inspeccion.tipo === 'invalido') return true;
 
-              if (tieneValorExcel) {
-                  if (!califActual || califActual.nota === null || califActual.nota === '') return true;
-                  if (Number(excelVal).toFixed(1) !== Number(califActual.nota).toFixed(1)) return true;
-              }
-              return false; 
-           });
+            const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
+            const califActual = calificaciones[califKey];
+            if (califActual && califActual.estadoCalificacion === 'PUBLICADA') return false;
+
+            if (inspeccion.tipo === 'valido') {
+              if (!califActual || califActual.nota === null || califActual.nota === '') return true;
+              if (inspeccion.valorNumerico.toFixed(1) !== Number(califActual.nota).toFixed(1)) return true;
+            }
+            return false;
+          });
         });
 
         if (columnasConCambios.length === 0) {
-           toast.info('Sin modificaciones útiles', { description: 'El documento no contiene notas nuevas, y las existentes ya están publicadas o no cambiaron.' });
-           e.target.value = '';
-           return;
+          toast.info('Sin modificaciones útiles', { description: 'El documento no contiene notas nuevas, y las existentes ya están publicadas o no cambiaron.' });
+          e.target.value = '';
+          return;
         }
 
-        const previsualizacion = filasDatos.map((fila, idx) => {
+        const previsualizacion = filasConIndice.map(({ r, fila }) => {
           const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
           const inscripcionEst = inscripciones.find(i => i.carnet.toLowerCase() === carnetStr);
 
           const notasAMostrar = columnasConCambios.map(col => {
-            const valor = fila[col.indiceColumna];
+            const inspeccion = inspeccionarCeldaExcel(primerHoja, r, col.indiceColumna);
+
+            if (inspeccion.tipo === 'invalido') {
+              return {
+                valor: inspeccion.valorMostrar,
+                estado: 'invalido',
+                motivoError: inspeccion.motivoError
+              };
+            }
+
             let estado = 'vacio';
-            
             if (inscripcionEst) {
-               const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
-               const califActual = calificaciones[califKey];
-               
-               if (califActual && califActual.estadoCalificacion === 'PUBLICADA') {
-                  estado = 'publicada';
-               } else {
-                  const tieneValorExcel = valor !== undefined && valor !== null && valor !== '';
-                  if (tieneValorExcel) {
-                     if (!califActual || califActual.nota === null || califActual.nota === '') {
-                        estado = 'nuevo';
-                     } else if (Number(valor).toFixed(1) !== Number(califActual.nota).toFixed(1)) {
-                        estado = 'modificado';
-                     } else {
-                        estado = 'sin_cambio';
-                     }
-                  }
-               }
+              const califKey = `${inscripcionEst.idInscripcion}-${col.evaluacion.idEvaluacion}`;
+              const califActual = calificaciones[califKey];
+
+              if (califActual && califActual.estadoCalificacion === 'PUBLICADA') {
+                estado = 'publicada';
+              } else if (inspeccion.tipo === 'valido') {
+                if (!califActual || califActual.nota === null || califActual.nota === '') {
+                  estado = 'nuevo';
+                } else if (inspeccion.valorNumerico.toFixed(1) !== Number(califActual.nota).toFixed(1)) {
+                  estado = 'modificado';
+                } else {
+                  estado = 'sin_cambio';
+                }
+              }
             }
 
             return {
-              valor: valor !== undefined && valor !== null && valor !== '' ? valor : null,
-              estado
+              valor: inspeccion.tipo === 'valido' ? inspeccion.valorNumerico : null,
+              estado,
+              motivoError: null
             };
           });
 
           return {
-            fila: idx + 2,
+            fila: r + 1,
             carnet: fila[0] || '',
             estudiante: fila[1] || '',
             notas: notasAMostrar
@@ -482,8 +540,12 @@ const IngresoNotas = () => {
     e.target.value = '';
   };
 
+  const hayErroresEnPrevisualizacion = datosPrevisualizacion.some(fila =>
+    fila.notas.some(n => n.estado === 'invalido')
+  );
+
   const confirmarCarga = async () => {
-    if (!archivoSeleccionado) return;
+    if (!archivoSeleccionado || hayErroresEnPrevisualizacion) return;
 
     setCargandoArchivo(true);
     try {
@@ -499,7 +561,7 @@ const IngresoNotas = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al cargar las notas');
+        throw new Error(errorData.message || errorData.error || 'Error al cargar las notas');
       }
 
       toast.success('Notas cargadas exitosamente', { description: 'Los registros fueron procesados correctamente.' });
@@ -530,7 +592,6 @@ const IngresoNotas = () => {
   });
 
   const hayEvaluacionesActivas = evaluaciones.some(ev => getEstadoEvaluacion(ev).estado === 'activo');
-  const evaluacionesActivas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
 
   if (cargando && grupos.length === 0) return (
     <div className="flex flex-col items-center justify-center pt-20">
@@ -810,6 +871,18 @@ const IngresoNotas = () => {
             </div>
 
             <div className="flex-1 overflow-auto px-6 py-4">
+              {hayErroresEnPrevisualizacion && (
+                <div className="mb-4 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="text-xs text-red-800">
+                    <p className="font-bold text-red-900">Se detectaron celdas inválidas en el Excel (marcadas en rojo)</p>
+                    <p className="mt-0.5">No se permiten fórmulas (ej. <code>=SUMA</code>), notas menores a 0.0 o mayores a 10.0, ni valores con más de 1 decimal. Corrige el archivo en Excel y vuelve a importarlo.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
@@ -837,6 +910,19 @@ const IngresoNotas = () => {
                           {fila.estudiante || <span className="text-gray-400 italic">Sin nombre</span>}
                         </td>
                         {fila.notas.map((notaObj, nIdx) => {
+                          if (notaObj.estado === 'invalido') {
+                            return (
+                              <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0 bg-red-50/40">
+                                <span
+                                  className="inline-flex flex-col items-center px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 border border-red-300"
+                                  title={notaObj.motivoError}
+                                >
+                                  <span>{notaObj.valor}</span>
+                                  <span className="text-[10px] font-medium text-red-600 mt-0.5">{notaObj.motivoError}</span>
+                                </span>
+                              </td>
+                            );
+                          }
                           if (notaObj.estado === 'publicada') {
                              return (
                                <td key={nIdx} className="px-4 py-3 text-center border-r border-gray-100 last:border-r-0 bg-gray-50/50">
@@ -881,10 +967,10 @@ const IngresoNotas = () => {
                 <div className="text-xs text-blue-800">
                   <p className="font-semibold">Filtro Inteligente Activo:</p>
                   <ul className="list-disc list-inside mt-1 space-y-0.5">
-                    <li>La previsualización <strong>solo muestra columnas que detectan notas nuevas o modificadas</strong>.</li>
+                    <li>La previsualización <strong>solo muestra columnas que detectan notas nuevas, modificadas o con errores</strong>.</li>
                     <li>Las notas marcadas en <span className="text-orange-700 font-bold">naranja</span> se subirán al sistema como borradores.</li>
+                    <li>Las celdas marcadas en <span className="text-red-700 font-bold">rojo</span> bloquean la carga hasta ser corregidas en Excel.</li>
                     <li>Las notas en <strong>gris oscuro</strong> están publicadas y se ignorarán automáticamente.</li>
-                    <li>Las notas en <span className="text-gray-400 font-bold">gris claro</span> coinciden con el borrador actual y no generarán cambios.</li>
                   </ul>
                 </div>
               </div>
@@ -894,7 +980,11 @@ const IngresoNotas = () => {
               <button onClick={cancelarCarga} disabled={cargandoArchivo} className="px-5 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium">
                 Cancelar
               </button>
-              <button onClick={confirmarCarga} disabled={cargandoArchivo} className="px-5 py-2.5 bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm flex items-center gap-2">
+              <button
+                onClick={confirmarCarga}
+                disabled={cargandoArchivo || hayErroresEnPrevisualizacion}
+                className="px-5 py-2.5 bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm flex items-center gap-2"
+              >
                 {cargandoArchivo ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> Cargando...</>
                 ) : (
