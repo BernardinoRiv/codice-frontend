@@ -167,9 +167,11 @@ const CatalogoAranceles = () => {
   const [ciclos, setCiclos] = useState([]);
   const [cicloSeleccionado, setCicloSeleccionado] = useState('');
   const [aranceles, setAranceles] = useState([]);
-  const [terminoBusqueda, setTerminoBusqueda] = useState(''); 
+  const [terminoBusqueda, setTerminoBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [cargandoCiclos, setCargandoCiclos] = useState(false);
   const [cargandoAranceles, setCargandoAranceles] = useState(false);
+  const [cambiandoEstadoId, setCambiandoEstadoId] = useState(null);
   
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [modalAgregarAbierto, setModalAgregarAbierto] = useState(false);
@@ -187,7 +189,8 @@ const CatalogoAranceles = () => {
   useEffect(() => {
     if (cicloSeleccionado) {
       cargarAranceles();
-      setTerminoBusqueda(''); 
+      setTerminoBusqueda('');
+      setFiltroEstado('TODOS');
     } else {
       setAranceles([]);
     }
@@ -290,6 +293,39 @@ const CatalogoAranceles = () => {
     }
   };
 
+  const toggleEstadoArancel = async (arancel) => {
+    const estaActivo = arancel.activo !== false;
+    const nuevoEstado = !estaActivo;
+
+    setCambiandoEstadoId(arancel.idConcepto);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        import.meta.env.VITE_API_URL + '/api/v1/finanzas/aranceles/' + arancel.idConcepto + '/estado',
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ activo: nuevoEstado })
+        }
+      );
+
+      if (response.ok) {
+        toast.success(nuevoEstado ? 'Arancel activado exitosamente.' : 'Arancel desactivado exitosamente.');
+        cargarAranceles();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.mensaje || err.error || 'No se pudo cambiar el estado del arancel.');
+      }
+    } catch (error) {
+      toast.error('Acción denegada', { description: error.message });
+    } finally {
+      setCambiandoEstadoId(null);
+    }
+  };
+
   const guardarNuevoArancel = async () => {
     if (!nuevoArancel.concepto.trim() || !nuevoArancel.monto || isNaN(nuevoArancel.monto)) {
       toast.error('Campos incompletos', { description: 'Llene el concepto y un monto válido.' });
@@ -330,9 +366,13 @@ const CatalogoAranceles = () => {
   const cicloActualObj = ciclos.find(c => c.idCiclo === Number(cicloSeleccionado));
   const esSoloLectura = cicloActualObj && (cicloActualObj.estadoCiclo === 'ACTIVO' || cicloActualObj.estadoCiclo === 'FINALIZADO');
 
-  const arancelesFiltrados = aranceles.filter(arancel => 
-    arancel.concepto.toLowerCase().includes(terminoBusqueda.toLowerCase())
-  );
+  const arancelesFiltrados = aranceles.filter(arancel => {
+    const coincideTexto = arancel.concepto.toLowerCase().includes(terminoBusqueda.toLowerCase());
+    const estaActivo = arancel.activo !== false;
+    if (filtroEstado === 'ACTIVOS') return coincideTexto && estaActivo;
+    if (filtroEstado === 'INACTIVOS') return coincideTexto && !estaActivo;
+    return coincideTexto;
+  });
 
   const opcionesCiclos = ciclos.map(ciclo => {
     const estadoCap = ciclo.estadoCiclo
@@ -355,7 +395,7 @@ const CatalogoAranceles = () => {
               Catálogo de aranceles
             </h1>
             <p className="text-gray-500 text-[14px] font-normal">
-              Gestiona los precios oficiales de la oferta académica por ciclo.
+              Gestiona los precios oficiales y disponibilidad de cobros por ciclo.
             </p>
           </div>
 
@@ -376,9 +416,9 @@ const CatalogoAranceles = () => {
           {/* Tabla de Aranceles */}
           {cicloSeleccionado && (
             <div className="border border-gray-200/90 rounded-2xl overflow-hidden bg-white shadow-[0_2px_12px_rgb(0,0,0,0.03)]">
-              <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
+              <div className="px-6 py-5 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white">
                 
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <h3 className="font-bold text-gray-900 text-[16px] flex items-center gap-2">
                     Conceptos financieros
                     <span className="bg-gray-100 text-gray-600 text-[12px] px-2.5 py-0.5 rounded-md font-medium">
@@ -396,9 +436,31 @@ const CatalogoAranceles = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                  {/* Filtro de Estado */}
+                  <div className="inline-flex rounded-xl bg-gray-100 p-1 text-[12px] font-medium">
+                    {[
+                      { id: 'TODOS', label: 'Todos' },
+                      { id: 'ACTIVOS', label: 'Activos' },
+                      { id: 'INACTIVOS', label: 'Desactivados' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setFiltroEstado(tab.id)}
+                        className={'px-3 py-1 rounded-lg transition-all ' + (
+                          filtroEstado === tab.id
+                            ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                            : 'text-gray-500 hover:text-gray-800'
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Buscador */}
-                  <div className="relative w-full sm:w-72 flex items-center">
+                  <div className="relative w-full sm:w-64 flex items-center">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -406,7 +468,7 @@ const CatalogoAranceles = () => {
                     </div>
                     <input
                       type="text"
-                      placeholder="Buscar por concepto o arancel..."
+                      placeholder="Buscar por concepto..."
                       value={terminoBusqueda}
                       onChange={(e) => setTerminoBusqueda(e.target.value)}
                       className="w-full pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-[13px] font-normal text-gray-800 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300 transition-all shadow-sm placeholder-gray-400"
@@ -444,11 +506,14 @@ const CatalogoAranceles = () => {
                       <th className="px-6 py-3.5 text-gray-400 font-semibold uppercase tracking-wider text-[11px]">
                         Concepto de cobro
                       </th>
-                      <th className="px-6 py-3.5 text-center text-gray-400 font-semibold uppercase tracking-wider text-[11px] w-48">
+                      <th className="px-6 py-3.5 text-center text-gray-400 font-semibold uppercase tracking-wider text-[11px] w-32">
+                        Estado
+                      </th>
+                      <th className="px-6 py-3.5 text-center text-gray-400 font-semibold uppercase tracking-wider text-[11px] w-40">
                         {'Monto base (' + MONEDA + ')'}
                       </th>
-                      <th className="px-6 py-3.5 text-center text-gray-400 font-semibold uppercase tracking-wider text-[11px] w-32">
-                        Acción
+                      <th className="px-6 py-3.5 text-center text-gray-400 font-semibold uppercase tracking-wider text-[11px] w-56">
+                        Acciones
                       </th>
                     </tr>
                   </thead>
@@ -456,43 +521,80 @@ const CatalogoAranceles = () => {
                   <tbody className="divide-y divide-gray-100/70">
                     {cargandoAranceles ? (
                       <tr>
-                        <td colSpan="3" className="px-6 py-12 text-center">
+                        <td colSpan="4" className="px-6 py-12 text-center">
                           <div className="inline-block animate-spin rounded-full h-7 w-7 border-2 border-gray-300 border-t-gray-800 mb-3"></div>
                           <p className="text-gray-400 font-normal text-[13px]">Consultando catálogo...</p>
                         </td>
                       </tr>
                     ) : arancelesFiltrados.length === 0 ? (
                       <tr>
-                        <td colSpan="3" className="px-6 py-12 text-center text-gray-400 font-normal text-[14px]">
+                        <td colSpan="4" className="px-6 py-12 text-center text-gray-400 font-normal text-[14px]">
                           No se encontraron conceptos financieros.
                         </td>
                       </tr>
                     ) : (
-                      arancelesFiltrados.map((arancel) => (
-                        <tr key={arancel.idConcepto} className="hover:bg-gray-50/60 transition-colors">
-                          <td className="px-6 py-4 font-normal text-gray-700 text-[14px]">
-                            {arancel.concepto.charAt(0).toUpperCase() + arancel.concepto.slice(1)}
-                          </td>
-                          <td className="px-6 py-4 text-center font-medium text-[#16a34a] text-[14px]">
-                            {MONEDA + Number(arancel.montoBase).toFixed(2)}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {esSoloLectura ? (
-                              <span className="text-[12px] text-gray-400 font-normal cursor-not-allowed">
-                                Solo lectura
+                      arancelesFiltrados.map((arancel) => {
+                        const estaActivo = arancel.activo !== false;
+                        const procesandoFila = cambiandoEstadoId === arancel.idConcepto;
+
+                        return (
+                          <tr
+                            key={arancel.idConcepto}
+                            className={'transition-colors ' + (estaActivo ? 'hover:bg-gray-50/60' : 'bg-gray-50/40 opacity-75')}
+                          >
+                            <td className="px-6 py-4 font-normal text-gray-700 text-[14px]">
+                              <span className={!estaActivo ? 'line-through text-gray-400' : ''}>
+                                {arancel.concepto.charAt(0).toUpperCase() + arancel.concepto.slice(1)}
                               </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => abrirModalEdicion(arancel)}
-                                className="px-4 py-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors text-[12px] font-medium shadow-sm"
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span
+                                className={'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + (
+                                  estaActivo
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                                )}
                               >
-                                Modificar
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                                {estaActivo ? 'Activo' : 'Desactivado'}
+                              </span>
+                            </td>
+                            <td className={'px-6 py-4 text-center font-medium text-[14px] ' + (estaActivo ? 'text-[#16a34a]' : 'text-gray-400')}>
+                              {MONEDA + Number(arancel.montoBase).toFixed(2)}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {esSoloLectura ? (
+                                <span className="text-[12px] text-gray-400 font-normal cursor-not-allowed">
+                                  Solo lectura
+                                </span>
+                              ) : (
+                                <div className="inline-flex items-center justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirModalEdicion(arancel)}
+                                    disabled={!estaActivo || procesandoFila}
+                                    title={!estaActivo ? 'Activa el arancel para modificar su monto' : 'Modificar precio'}
+                                    className="px-3.5 py-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-medium shadow-sm"
+                                  >
+                                    Modificar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleEstadoArancel(arancel)}
+                                    disabled={procesandoFila}
+                                    className={'px-3.5 py-1.5 rounded-lg border transition-colors text-[12px] font-medium shadow-sm disabled:opacity-50 ' + (
+                                      estaActivo
+                                        ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    )}
+                                  >
+                                    {procesandoFila ? '...' : (estaActivo ? 'Desactivar' : 'Activar')}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
