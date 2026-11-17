@@ -397,6 +397,8 @@ function ListaDocentes() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [reseteandoUsuario, setReseteandoUsuario] = useState(null);
+  const [modalReset, setModalReset] = useState(null);
 
   const fetchDocentes = async () => {
     setIsLoading(true);
@@ -648,6 +650,50 @@ function ListaDocentes() {
       toast.error("Error de conexión con el servidor");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const docente = modalReset;
+
+    if (!docente?.idUsuario || reseteandoUsuario !== null) return;
+
+    const nombre = `${docente.nombres} ${docente.apellidos}`;
+
+    setReseteandoUsuario(docente.idUsuario);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/v1/auth/admin/usuarios/${docente.idUsuario}/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data.mensaje || data.error || "No se pudo restablecer la contraseña.",
+        );
+      }
+
+      setModalReset(null);
+
+      toast.success("Contraseña restablecida correctamente", {
+        description: `Se ha iniciado el envío de las nuevas credenciales al correo institucional de ${nombre}.`,
+      });
+    } catch (error) {
+      toast.error("No se pudo restablecer la contraseña", {
+        description: error.message,
+      });
+    } finally {
+      setReseteandoUsuario(null);
     }
   };
 
@@ -1196,6 +1242,39 @@ function ListaDocentes() {
                         <td className="px-5 py-5 text-right align-top whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
+                              type="button"
+                              onClick={() => setModalReset(docente)}
+                              disabled={
+                                !docente.idUsuario ||
+                                reseteandoUsuario !== null ||
+                                isSaving
+                              }
+                              title="Restablecer contraseña"
+                              aria-label={`Restablecer contraseña de ${docente.nombres} ${docente.apellidos}`}
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect
+                                  x="3"
+                                  y="11"
+                                  width="18"
+                                  height="10"
+                                  rx="2"
+                                />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                <path d="M12 15v2" />
+                              </svg>
+                            </button>
+
+                            <button
                               disabled={
                                 cargandoCatalogos || errorCatalogos || isSaving
                               }
@@ -1217,9 +1296,6 @@ function ListaDocentes() {
                                   d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
                                 />
                               </svg>
-                              <span className="text-xs font-semibold">
-                                Editar
-                              </span>
                             </button>
 
                             <button
@@ -1227,7 +1303,11 @@ function ListaDocentes() {
                                 cargandoCatalogos || errorCatalogos || isSaving
                               }
                               onClick={() => handleAbrirCambiarEstado(docente)}
-                              title={esActivo ? "Desactivar docente" : "Activar docente"}
+                              title={
+                                esActivo
+                                  ? "Desactivar docente"
+                                  : "Activar docente"
+                              }
                               aria-label={`Cambiar estado de ${docente.nombres} ${docente.apellidos}`}
                               className={`inline-flex items-center justify-center transition-colors w-9 h-9 rounded-lg border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed ${
                                 esActivo
@@ -1594,6 +1674,99 @@ function ListaDocentes() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </DialogoDocente>,
+          document.body,
+        )}
+
+      {modalReset &&
+        createPortal(
+          <DialogoDocente
+            titulo="Restablecer contraseña"
+            ocupado={reseteandoUsuario !== null}
+            onClose={() => setModalReset(null)}
+          >
+            <div
+              className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+              onClick={() => {
+                if (reseteandoUsuario === null) setModalReset(null);
+              }}
+            />
+
+            <div className="relative flex min-h-screen items-center justify-center p-4 pointer-events-none">
+              <div className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <svg
+                      className="w-6 h-6"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="11" width="18" height="10" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      <path d="M12 15v2" />
+                    </svg>
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Restablecer contraseña
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {modalReset.nombres} {modalReset.apellidos}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 break-all">
+                    {modalReset.correoInstitucional}
+                  </p>
+                </div>
+
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                  Se cerrarán sus sesiones activas y se enviará una contraseña
+                  temporal a su correo institucional.
+                </p>
+
+                <div className="mt-7 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalReset(null)}
+                    disabled={reseteandoUsuario !== null}
+                    className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={reseteandoUsuario !== null}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {reseteandoUsuario !== null && (
+                      <svg
+                        className="h-4 w-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M12 3a9 9 0 1 0 9 9" />
+                      </svg>
+                    )}
+
+                    {reseteandoUsuario !== null
+                      ? "Restableciendo..."
+                      : "Reestablecer"}
+                  </button>
+                </div>
               </div>
             </div>
           </DialogoDocente>,
