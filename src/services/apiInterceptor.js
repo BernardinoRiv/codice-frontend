@@ -1,48 +1,18 @@
-const API_URL = import.meta.env.VITE_API_URL;
-let isRedirecting = false;
+const API_URL = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
 
-const apiInterceptor = async (url, options = {}) => {
-  const token = localStorage.getItem('token');
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-    ...options.headers
-  };
-
-  try {
-    // Al usar fetch, pasará por el fetchInterceptor global automáticamente
-    const response = await fetch(`${API_URL}${url}`, {
-      ...options,
-      headers
-    });
-
-    if (response.status === 401) {
-      if (!isRedirecting) {
-        isRedirecting = true;
-        localStorage.clear();
-        window.location.replace('/');
-        throw new Error('Sesion cerrada');
-      }
-    }
-
-    if (response.status === 403) {
-      throw new Error('No tiene permisos para esta accion');
-    }
-
-    return response;
-  } catch (error) {
-    if (error.message === 'Sesion cerrada') {
-      if (!isRedirecting) {
-        isRedirecting = true;
-        localStorage.clear();
-        window.location.replace('/');
-      }
-    }
-    // NOTA: Eliminamos la regla que borraba la sesión al recibir 'Failed to fetch'.
-    // Ahora el usuario puede recargar la página (F5) sin ser expulsado.
-    throw error;
+export default async function apiInterceptor(url, options = {}) {
+  if (!API_URL) throw new Error('No se configuró la dirección de la API.');
+  if (typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//')) {
+    throw new Error('La ruta de la API no es válida.');
   }
-};
-
-export default apiInterceptor;
+  const headers = new Headers(options.headers);
+  headers.set('Accept', 'application/json');
+  if (typeof options.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  const response = await fetch(`${API_URL}${url}`, { ...options, headers });
+  if (response.status === 403) {
+    throw Object.assign(new Error('No tienes permisos para esta acción.'), { status: 403 });
+  }
+  return response;
+}

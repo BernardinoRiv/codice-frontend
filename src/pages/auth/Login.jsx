@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import imagenFondo from '../../IMG_1534.JPG.jpeg';
+
+import { guardarSesion, destinoSesion } from '../../utils/sesion';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -11,9 +13,12 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
+  const enviando = useRef(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (enviando.current) return;
+    enviando.current = true;
     setIsLoading(true);
 
     try {
@@ -21,14 +26,15 @@ function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          correoInstitucional: email,
+          correoInstitucional: email.trim(),
           password: password
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!data || typeof data !== 'object') throw new Error('El servidor devolvió una respuesta inválida. Intenta nuevamente.');
 
-      if (!response.ok || data.exito === false) {
+      if (!response.ok || data.exito !== true) {
         if (data.bloqueadoHasta) {
           const fechaDesbloqueo = new Date(data.bloqueadoHasta);
           const hora = fechaDesbloqueo.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -48,32 +54,23 @@ function Login() {
         return;
       }
 
-      localStorage.clear();
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('nombreCompleto', data.nombreCompleto);
-      localStorage.setItem('rol', data.rol);
-      localStorage.setItem('ultimoAcceso', data.ultimoAcceso);
-
-      if (data.codigoCiclo) {
-        localStorage.setItem('codigoCiclo', data.codigoCiclo);
-      }
-
-      if (!data.ultimoAcceso || String(data.ultimoAcceso) === 'null' || String(data.ultimoAcceso) === 'undefined') {
-        toast.info('Primer ingreso detectado', {
-          description: 'Por seguridad institucional, debes cambiar tu contraseña.'
+      const sesion = guardarSesion(data);
+      if (sesion.requiereCambio) {
+        toast.info('Cambio de contraseña requerido', {
+          description: 'Debes cambiar tu contraseña antes de acceder al portal.',
         });
-        navigate('/forzar-password');
-      } else {
-        toast.success(`¡Bienvenido, ${data.nombreCompleto}!`);
-        navigate('/dashboard/inicio');
+      } else if (sesion.roles.length) {
+        toast.success(`¡Bienvenido, ${sesion.nombreCompleto}!`);
       }
+      setPassword('');
+      navigate(destinoSesion(sesion), { replace: true });
 
     } catch (err) {
       toast.error('Error de conexión', {
-        description: 'No se pudo conectar con el servidor. Revisa tu internet.'
+        description: err.message || 'No se pudo conectar con el servidor. Revisa tu internet.'
       });
     } finally {
+      enviando.current = false;
       setIsLoading(false);
     }
   };
