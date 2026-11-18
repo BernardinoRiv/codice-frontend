@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'sonner';
 
@@ -9,97 +9,90 @@ const EscanearAsistencia = () => {
   const [enviando, setEnviando] = useState(false);
   
   const html5QrCodeRef = useRef(null);
+  const operacionCamara = useRef(Promise.resolve());
+  const montado = useRef(false);
+  const envioActivo = useRef(false);
+  const capturaActiva = useRef(false);
+  const inicioActivo = useRef(false);
+
+  const encolarCamara = tarea => {
+    const operacion = operacionCamara.current.catch(() => {}).then(tarea);
+    operacionCamara.current = operacion;
+    return operacion;
+  };
 
   useEffect(() => {
-    html5QrCodeRef.current = new Html5Qrcode("reader");
-    
+    montado.current = true;
     return () => {
-      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-        html5QrCodeRef.current.stop().catch(() => {});
-      }
-      if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.clear();
-      }
+      montado.current = false;
+      const scanner = html5QrCodeRef.current;
+      html5QrCodeRef.current = null;
+      encolarCamara(async () => {
+        if (scanner?.isScanning) await scanner.stop();
+        scanner?.clear();
+      }).catch(() => {});
     };
   }, []);
 
+  const stopScanning = () => encolarCamara(async () => {
+    const scanner = html5QrCodeRef.current;
+    if (scanner?.isScanning) await scanner.stop();
+    if (montado.current) setIsScanning(false);
+  });
+
   const startScanning = async () => {
-    setIsScanning(true);
+    if (inicioActivo.current || envioActivo.current || !montado.current) return;
+    inicioActivo.current = true;
     setScanResult(null);
-    
+    setIsScanning(true);
     try {
-      await html5QrCodeRef.current.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
-        },
-        onScanSuccess,
-        onScanFailure
-      );
-    } catch (err) {
-      toast.error("No se pudo acceder a la cámara", { 
-        description: "Verifica los permisos o usa el ingreso manual." 
-      });
-      setIsScanning(false);
-    }
-  };
-
-  const stopScanning = async () => {
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      await html5QrCodeRef.current.stop();
-      setIsScanning(false);
-    }
-  };
-
-  const onScanSuccess = async (decodedText) => {
-    await stopScanning();
-    await registrarAsistencia(decodedText);
-  };
-
-  const onScanFailure = () => {};
-
-  const registrarAsistencia = async (token) => {
-    setEnviando(true);
-    try {
-      const authToken = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/asistencia/registrar?token=${token}`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json'
+      await encolarCamara(async () => {
+        if (!montado.current) return;
+        if (!html5QrCodeRef.current) html5QrCodeRef.current = new Html5Qrcode('reader');
+        const scanner = html5QrCodeRef.current;
+        if (scanner.isScanning) return;
+        await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, onScanSuccess, () => {});
+        if (!montado.current || html5QrCodeRef.current !== scanner) {
+          if (scanner.isScanning) await scanner.stop();
+          scanner.clear();
         }
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.exito) {
-        setScanResult({ success: true, message: data.mensaje });
-        toast.success("¡Asistencia registrada!", { description: data.mensaje });
-        setTokenManual('');
-      } else {
-        setScanResult({ success: false, message: data.mensaje || "Error al registrar" });
-        toast.error("Registro fallido", { description: data.mensaje });
-        setTimeout(() => {
-          setScanResult(null);
-          if (!tokenManual) startScanning(); 
-        }, 3000);
-      }
-    } catch (error) {
-      setScanResult({ success: false, message: "Error de conexión con el servidor" });
-      toast.error("Error de conexión", { description: error.message });
-    } finally {
-      setEnviando(false);
-    }
+    } catch {
+      if (montado.current) { toast.error('No se pudo abrir la cámara. Revisa los permisos o usa el código manual.'); setIsScanning(false); }
+    } finally { inicioActivo.current = false; }
   };
 
-  const handleManualSubmit = (e) => {
+  const onScanSuccess = async texto => {
+    if (capturaActiva.current || envioActivo.current || !montado.current) return;
+    capturaActiva.current = true;
+    try { await stopScanning(); await registrarAsistencia(texto); }
+    catch { if (montado.current) toast.error('No se pudo detener la cámara. Intenta nuevamente.'); }
+    finally { capturaActiva.current = false; }
+  };
+
+  const registrarAsistencia = async token => {
+    if (envioActivo.current || !montado.current) return;
+    if (typeof token !== 'string' || !token.trim() || token.length > 2048) return toast.error('Código de asistencia inválido.');
+    envioActivo.current = true; setEnviando(true);
+    try {
+      await stopScanning();
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/asistencia/registrar?token=${encodeURIComponent(token.trim())}`, { method: 'POST', headers: { Accept: 'application/json' } });
+      const data = await response.json();
+      if (!montado.current) return;
+      if (response.ok && data.exito === true) {
+        setScanResult({ success: true, message: data.mensaje || 'Asistencia registrada.' });
+        toast.success('¡Asistencia registrada!'); setTokenManual('');
+      } else {
+        setScanResult({ success: false, message: data.mensaje || 'No se pudo registrar la asistencia. Revisa el código e intenta de nuevo.' });
+      }
+    } catch {
+      if (montado.current) setScanResult({ success: false, message: 'No se pudo confirmar el registro. Consulta con tu docente antes de intentarlo nuevamente.' });
+    } finally { envioActivo.current = false; if (montado.current) setEnviando(false); }
+  };
+
+  const handleManualSubmit = e => {
     e.preventDefault();
-    if (tokenManual.length !== 4) {
-      toast.error("El código debe tener exactamente 4 dígitos");
-      return;
-    }
+    if (!/^\d{4}$/.test(tokenManual.trim())) return toast.error('El código debe tener exactamente 4 dígitos.');
     setScanResult(null);
     registrarAsistencia(tokenManual.trim());
   };
@@ -146,7 +139,7 @@ const EscanearAsistencia = () => {
                 <div id="reader" className="w-full min-h-[220px]"></div>
               </div>
               <button
-                onClick={stopScanning}
+                onClick={() => stopScanning().catch(() => toast.error('No se pudo detener la cámara.'))}
                 className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 backdrop-blur-md text-white p-2 rounded-full transition-colors z-10"
                 title="Cancelar escaneo"
               >
@@ -156,7 +149,7 @@ const EscanearAsistencia = () => {
               </button>
             </div>
 
-            {scanResult && !tokenManual && (
+            {scanResult && (
               <div className="text-center animate-in fade-in zoom-in-95 duration-300">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${scanResult.success ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                   {scanResult.success ? (

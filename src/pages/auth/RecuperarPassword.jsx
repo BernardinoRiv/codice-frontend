@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { generarClave } from '../../utils/vistasSeguras';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import imagenFondo from '../../IMG_1534.JPG.jpeg';
 
 function RecuperarPassword() {
+  const solicitudActiva = useRef(false);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -14,41 +16,19 @@ function RecuperarPassword() {
   const [nuevaContrasena, setNuevaContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
 
-  const [validations, setValidations] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false,
-    special: false
-  });
-
   const navigate = useNavigate();
-
-  useEffect(() => {
-    setValidations({
-      length: nuevaContrasena.length >= 8,
-      uppercase: /[A-Z]/.test(nuevaContrasena),
-      lowercase: /[a-z]/.test(nuevaContrasena),
-      number: /[0-9]/.test(nuevaContrasena),
-      special: /[\W_]/.test(nuevaContrasena)
-    });
-  }, [nuevaContrasena]);
+  const validations = {
+    length: nuevaContrasena.length >= 8,
+    uppercase: /[A-Z]/.test(nuevaContrasena),
+    lowercase: /[a-z]/.test(nuevaContrasena),
+    number: /[0-9]/.test(nuevaContrasena),
+    special: /[^A-Za-z0-9\s]/.test(nuevaContrasena),
+  };
 
   const allValid = Object.values(validations).every(Boolean);
 
   const generarContrasena = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
-    let pswd = '';
-    pswd += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-    pswd += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-    pswd += '0123456789'[Math.floor(Math.random() * 10)];
-    pswd += '!@#$%^&*()_+'[Math.floor(Math.random() * 12)];
-    
-    for (let i = 0; i < 8; i++) {
-      pswd += chars[Math.floor(Math.random() * chars.length)];
-    }
-    
-    const finalPswd = pswd.split('').sort(() => 0.5 - Math.random()).join('');
+    const finalPswd = generarClave();
     setNuevaContrasena(finalPswd);
     setConfirmarContrasena(finalPswd);
     setShowPassword(true);
@@ -57,44 +37,50 @@ function RecuperarPassword() {
 
   const handleSolicitarCodigo = async (e) => {
     e.preventDefault();
+    if (solicitudActiva.current) return;
     if (!email) {
       toast.warning('Ingresa tu correo institucional.');
       return;
     }
     
+    solicitudActiva.current = true;
     setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/solicitar-recuperacion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correoInstitucional: email })
+        body: JSON.stringify({ correoInstitucional: email.trim() })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!data) { toast.error(`Respuesta no válida del servidor (${response.status}). Intenta más tarde.`); return; }
 
-      if (!response.ok) {
+      if (!response.ok || data.exito === false) {
         toast.error(data.mensaje || 'Error al solicitar el código.');
         setIsLoading(false);
         return;
       }
 
-      toast.success('Código enviado', {
-        description: 'Revisa tu bandeja de entrada o la carpeta de spam.'
+      toast.success('Solicitud recibida', {
+        description: 'Si el correo corresponde a una cuenta, recibirás las instrucciones. Revisa también spam.'
       });
       
       setStep(2);
-    } catch (err) {
+    } catch {
       toast.error('Error de conexión', {
         description: 'No se pudo conectar con el servidor.'
       });
     } finally {
+      solicitudActiva.current = false;
       setIsLoading(false);
     }
   };
 
   const handleRestablecerClave = async (e) => {
     e.preventDefault();
+    if (solicitudActiva.current) return;
     
+    if (!codigo.trim()) return toast.error('Ingresa el código recibido por correo.');
     if (!allValid) {
       toast.error('La contraseña no cumple con los requisitos de seguridad.');
       return;
@@ -105,20 +91,22 @@ function RecuperarPassword() {
       return;
     }
 
+    solicitudActiva.current = true;
     setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/restablecer-clave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          correoInstitucional: email,
-          codigo: codigo,
+          correoInstitucional: email.trim(),
+          codigo: codigo.trim(),
           nuevaContrasena: nuevaContrasena,
           confirmarContrasena: confirmarContrasena
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!data) { toast.error(`Respuesta no válida del servidor (${response.status}). Intenta más tarde.`); return; }
 
       if (!response.ok || data.exito === false) {
         toast.error(data.mensaje || 'Error al restablecer la contraseña.');
@@ -130,13 +118,17 @@ function RecuperarPassword() {
         description: 'Ya puedes iniciar sesión con tu nueva contraseña.'
       });
       
-      navigate('/'); 
+      setNuevaContrasena('');
+      setConfirmarContrasena('');
+      setCodigo('');
+      navigate('/', { replace: true });
 
-    } catch (err) {
+    } catch {
       toast.error('Error de conexión', {
         description: 'No se pudo conectar con el servidor.'
       });
     } finally {
+      solicitudActiva.current = false;
       setIsLoading(false);
     }
   };
