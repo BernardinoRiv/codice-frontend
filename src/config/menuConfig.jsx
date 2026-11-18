@@ -1,17 +1,17 @@
-import React from "react";
+import React from 'react';
 
 export const menuMaestro = [
   // GENERAL
   {
-    name: "Inicio",
-    path: "/dashboard/inicio",
+    name: 'Inicio',
+    path: '/dashboard/inicio',
     rolesPermitidos: [
-      "DOCENTE",
-      "ESTUDIANTE",
-      "FINANZAS",
-      "ADMINISTRADOR",
-      "REGISTRO_ACADEMICO",
-      "EMPLEADO",
+      'DOCENTE',
+      'ESTUDIANTE',
+      'FINANZAS',
+      'ADMINISTRADOR',
+      'REGISTRO_ACADEMICO',
+      'EMPLEADO',
     ],
     icon: (
       <svg
@@ -33,9 +33,9 @@ export const menuMaestro = [
 
   // ÁREA ESTUDIANTIL
   {
-    name: "Mis clases y pensum",
-    path: "/dashboard/clases",
-    rolesPermitidos: ["ESTUDIANTE"],
+    name: 'Mis clases y pensum',
+    path: '/dashboard/clases',
+    rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -54,9 +54,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Mis calificaciones",
-    path: "/dashboard/mis-notas",
-    rolesPermitidos: ["ESTUDIANTE"],
+    name: 'Mis calificaciones',
+    path: '/dashboard/mis-notas',
+    rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -75,9 +75,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Mi estado de cuenta",
-    path: "/dashboard/mi-estado-cuenta",
-    rolesPermitidos: ["ESTUDIANTE"],
+    name: 'Mi estado de cuenta',
+    path: '/dashboard/mi-estado-cuenta',
+    rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -96,9 +96,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Registrar asistencia",
-    path: "/dashboard/escanear-asistencia",
-    rolesPermitidos: ["ESTUDIANTE"],
+    name: 'Registrar asistencia',
+    path: '/dashboard/escanear-asistencia',
+    rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -124,9 +124,9 @@ export const menuMaestro = [
 
   // ÁREA DOCENTE
   {
-    name: "Ingreso de notas",
-    path: "/dashboard/notas",
-    rolesPermitidos: ["DOCENTE"],
+    name: 'Ingreso de notas',
+    path: '/dashboard/notas',
+    rolesPermitidos: ['DOCENTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -145,9 +145,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Asistencias",
-    path: "/dashboard/asistencias",
-    rolesPermitidos: ["DOCENTE"],
+    name: 'Asistencias',
+    path: '/dashboard/asistencias',
+    rolesPermitidos: ['DOCENTE'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -168,9 +168,9 @@ export const menuMaestro = [
 
   // REGISTRO ACADÉMICO Y ADMISIONES
   {
-    name: "Ingreso de aspirantes",
-    path: "/dashboard/nuevo-ingreso",
-    rolesPermitidos: ["ADMINISTRADOR", "REGISTRO_ACADEMICO", "EMPLEADO"],
+    name: 'Ingreso de aspirantes',
+    path: '/dashboard/nuevo-ingreso',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -189,9 +189,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Oferta académica",
-    path: "/dashboard/oferta-academica",
-    rolesPermitidos: ["REGISTRO_ACADEMICO", "EMPLEADO", "ADMINISTRADOR"],
+    name: 'Oferta académica',
+    path: '/dashboard/oferta-academica',
+    rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO', 'ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -210,9 +210,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Ciclos en planificación",
-    path: "/dashboard/ciclos-planificacion",
-    rolesPermitidos: ["ADMINISTRADOR", "REGISTRO_ACADEMICO", "EMPLEADO"],
+    name: 'Ciclos en planificación',
+    path: '/dashboard/ciclos-planificacion',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -231,9 +231,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Gestión de secciones",
-    path: "/dashboard/gestion-secciones",
-    rolesPermitidos: ["ADMINISTRADOR", "REGISTRO_ACADEMICO", "EMPLEADO"],
+    name: 'Gestión de secciones',
+    path: '/dashboard/gestion-secciones',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -252,9 +252,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Gestión de carreras",
-    path: "/dashboard/carreras",
-    rolesPermitidos: ["ADMINISTRADOR"],
+    name: 'Gestión de carreras',
+    path: '/dashboard/carreras',
+    rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -272,11 +272,10 @@ export const menuMaestro = [
       </svg>
     ),
   },
-
   {
-    name: "Gestión de pensum",
-    path: "/dashboard/gestion-pensum",
-    rolesPermitidos: ["ADMINISTRADOR"],
+    name: 'Gestión de pensum',
+    path: '/dashboard/pensum',
+    rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -289,7 +288,7 @@ export const menuMaestro = [
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"
+          d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"
         />
       </svg>
     ),
@@ -297,9 +296,9 @@ export const menuMaestro = [
 
   // RECURSOS HUMANOS / PERSONAL
   {
-    name: "Registro de empleado",
-    path: "/dashboard/registro-empleados",
-    rolesPermitidos: ["ADMINISTRADOR"],
+    name: 'Registro de empleado',
+    path: '/dashboard/registro-empleados',
+    rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -318,9 +317,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Registro de docente",
-    path: "/dashboard/registro-docente",
-    rolesPermitidos: ["ADMINISTRADOR"],
+    name: 'Registro de docente',
+    path: '/dashboard/registro-docente',
+    rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -340,9 +339,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Directorio de docentes",
-    path: "/dashboard/directorio-docentes",
-    rolesPermitidos: ["ADMINISTRADOR", "REGISTRO_ACADEMICO"],
+    name: 'Directorio de docentes',
+    path: '/dashboard/directorio-docentes',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -363,9 +362,9 @@ export const menuMaestro = [
 
   // FINANZAS Y COLECTURÍA
   {
-    name: "Pagos y aranceles",
-    path: "/dashboard/pagos",
-    rolesPermitidos: ["FINANZAS", "ADMINISTRADOR"],
+    name: 'Pagos y aranceles',
+    path: '/dashboard/pagos',
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -384,9 +383,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Aranceles",
-    path: "/dashboard/aranceles",
-    rolesPermitidos: ["FINANZAS", "ADMINISTRADOR"],
+    name: 'Aranceles',
+    path: '/dashboard/aranceles',
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -405,9 +404,9 @@ export const menuMaestro = [
     ),
   },
   {
-    name: "Facturas",
-    path: "/dashboard/facturas",
-    rolesPermitidos: ["FINANZAS", "ADMINISTRADOR"],
+    name: 'Facturas',
+    path: '/dashboard/facturas',
+    rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

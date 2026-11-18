@@ -28,6 +28,7 @@ import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
 import Facturas from './pages/finanzas/Facturas';
 import GestionCarreras from './pages/academico/GestionCarreras';
+import GestionPensum from './pages/academico/GestionPensum';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 
 const VISTAS = {
@@ -35,6 +36,7 @@ const VISTAS = {
   'registro-empleados': RegistroEmpleado,
   'registro-docente': RegistroDocente,
   'carreras': GestionCarreras,
+  'pensum': GestionPensum,
   'directorio-docentes': ListaDocentes,
   'nuevo-ingreso': RegistroNuevoIngreso,
   'oferta-academica': AperturaSeccion,
