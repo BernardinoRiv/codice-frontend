@@ -686,7 +686,7 @@ function ListaDocentes() {
       setModalReset(null);
 
       toast.success("Contraseña restablecida correctamente", {
-        description: `Se ha iniciado el envío de las nuevas credenciales al correo institucional de ${nombre}.`,
+        description: `Se ha iniciado el envío de las nuevas credenciales al correo personal de ${nombre}.`,
       });
     } catch (error) {
       toast.error("No se pudo restablecer la contraseña", {
@@ -1725,13 +1725,14 @@ function ListaDocentes() {
                     {modalReset.nombres} {modalReset.apellidos}
                   </p>
                   <p className="mt-1 text-xs text-slate-500 break-all">
-                    {modalReset.correoInstitucional}
+                    <strong>Correo personal: </strong>
+                    {modalReset.correoPersonal}
                   </p>
                 </div>
 
                 <p className="mt-4 text-sm leading-relaxed text-slate-600">
                   Se cerrarán sus sesiones activas y se enviará una contraseña
-                  temporal a su correo institucional.
+                  temporal a su correo personal.
                 </p>
 
                 <div className="mt-7 flex justify-end gap-3">
