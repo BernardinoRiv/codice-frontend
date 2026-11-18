@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -258,7 +258,7 @@ const GestionSecciones = ({ idCicloProp }) => {
         const aulaCoincidente = listaAulas.find(a => a.codigoAula === seccion.aulaOEnlace || String(a.idAula) === String(seccion.idAula));
         if (aulaCoincidente) setFormEdit(prev => ({ ...prev, idAula: String(aulaCoincidente.idAula) }));
       }
-    } catch (err) {
+    } catch {
       toast.error('Error al cargar catálogos de la sede');
     } finally {
       setLoadingCatalogosEdit(false);
@@ -347,76 +347,45 @@ const GestionSecciones = ({ idCicloProp }) => {
       toast.error('Habilita las ventanas emergentes para exportar el informe PDF.');
       return;
     }
-    const filasHtml = seccionesFiltradas.map((s, idx) => {
-      const franjas = (s.horarios && s.horarios.length > 0)
-        ? s.horarios.map(h => `${h.dia}: ${h.horaInicio.substring(0, 5)} - ${h.horaFin.substring(0, 5)}`).join('<br>')
-        : 'Sin horarios';
-      return `
-        <tr>
-          <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
-          <td><strong>${s.codigoGrupo}</strong></td>
-          <td>${s.nombreCarrera || s.carrera || 'Carrera general'}</td>
-          <td><strong>${s.nombreMateria}</strong><br><small style="color: #475569;">${s.codigoMateria}</small></td>
-          <td>${s.nombreDocente}</td>
-          <td>${s.nombreSede}</td>
-          <td>${s.modalidad}<br><small style="color: #475569;">${s.aulaOEnlace || 'N/A'}</small></td>
-          <td style="font-size: 8.5pt;">${franjas}</td>
-          <td style="text-align: center; font-weight: bold;">${s.cupoMaximo}</td>
-          <td>${s.estadoGrupo}</td>
-        </tr>
-      `;
-    }).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Oferta académica - Ciclo ${cicloMeta.codigoCiclo}</title>
-          <style>
-            @page { size: landscape; margin: 14mm; }
-            body { font-family: system-ui, -apple-system, sans-serif; font-size: 9pt; color: #0f172a; margin: 0; padding: 16px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
-            .header h1 { font-size: 14pt; color: #0f172a; margin: 0; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-            th { background: #0f172a; color: #ffffff; padding: 8px; text-align: left; text-transform: uppercase; }
-            td { border-bottom: 1px solid #cbd5e1; padding: 7px; vertical-align: top; }
-            .no-print { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: 500; }
-            @media print { .no-print { display: none; } }
-          </style>
-        </head>
-        <body>
-          <div class="no-print">
-            <span>Vista previa de impresión — Ciclo ${cicloMeta.codigoCiclo}</span>
-            <button onclick="window.print()" style="background:#0f172a;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:bold;">Imprimir informe PDF</button>
-          </div>
-          <div class="header">
-            <div>
-              <h1>Universidad Modular Abierta</h1>
-              <p style="margin:4px 0 0;color:#475569;font-weight:500;">Matriz consolidada de secciones — Ciclo ${cicloMeta.codigoCiclo} (${cicloMeta.estadoCiclo})</p>
-            </div>
-            <div style="text-align:right;font-size:8.5pt;color:#475569;font-weight:500;">
-              Total secciones: <strong>${seccionesFiltradas.length}</strong>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Código</th>
-                <th>Carrera</th>
-                <th>Asignatura</th>
-                <th>Catedrático</th>
-                <th>Sede</th>
-                <th>Modalidad / Aula</th>
-                <th>Horarios</th>
-                <th>Cupos</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>${filasHtml}</tbody>
-          </table>
-        </body>
-      </html>
-    `);
+    printWindow.opener = null;
+    const doc = printWindow.document;
+    doc.title = `Oferta académica - Ciclo ${cicloMeta.codigoCiclo}`;
+    const estilo = doc.createElement('style');
+    estilo.textContent = `@page { size: landscape; margin: 14mm; }
+      body { font: 10pt system-ui, sans-serif; color: #0f172a; padding: 16px; }
+      h1 { font-size: 18pt; } table { width: 100%; border-collapse: collapse; }
+      th { background: #0f172a; color: white; text-align: left; }
+      th, td { padding: 8px; border-bottom: 1px solid #cbd5e1; white-space: pre-line; vertical-align: top; }
+      button { background: #0f172a; color: white; padding: 12px 18px; border: 0; border-radius: 8px; cursor: pointer; }
+      @media print { button { display: none; } tr { break-inside: avoid; } }`;
+    doc.head.appendChild(estilo);
+    const agregar = (padre, etiqueta, texto) => {
+      const elemento = doc.createElement(etiqueta);
+      elemento.textContent = String(texto ?? '—');
+      padre.appendChild(elemento);
+      return elemento;
+    };
+    agregar(doc.body, 'button', 'Imprimir informe PDF').addEventListener('click', () => printWindow.print());
+    agregar(doc.body, 'h1', 'Universidad Modular Abierta');
+    agregar(doc.body, 'p', `Matriz de secciones · Ciclo ${cicloMeta.codigoCiclo} (${cicloMeta.estadoCiclo}) · ${seccionesFiltradas.length} secciones`);
+    const tabla = doc.createElement('table');
+    doc.body.appendChild(tabla);
+    const cabecera = doc.createElement('thead');
+    tabla.appendChild(cabecera);
+    const filaCabecera = doc.createElement('tr');
+    cabecera.appendChild(filaCabecera);
+    ['#', 'Código', 'Carrera', 'Asignatura', 'Docente', 'Sede', 'Modalidad / Aula', 'Horarios', 'Cupos', 'Estado'].forEach(texto => agregar(filaCabecera, 'th', texto));
+    const cuerpo = doc.createElement('tbody');
+    tabla.appendChild(cuerpo);
+    seccionesFiltradas.forEach((seccion, indice) => {
+      const fila = doc.createElement('tr');
+      cuerpo.appendChild(fila);
+      const horarios = Array.isArray(seccion.horarios) ? seccion.horarios.map(h => `${h.dia}: ${String(h.horaInicio ?? '').slice(0, 5)} - ${String(h.horaFin ?? '').slice(0, 5)}`).join('\n') : '';
+      [indice + 1, seccion.codigoGrupo, seccion.nombreCarrera || seccion.carrera || 'Carrera general',
+        `${seccion.nombreMateria ?? ''}\n${seccion.codigoMateria ?? ''}`, seccion.nombreDocente, seccion.nombreSede,
+        `${seccion.modalidad ?? ''}\n${seccion.aulaOEnlace || 'N/A'}`, horarios || 'Sin horarios', seccion.cupoMaximo,
+        seccion.estadoGrupo].forEach(valor => agregar(fila, 'td', valor));
+    });
   };
 
   const opcionesFiltroCarreras = Object.entries(kpis.mapaCarreras).map(([nombre, cant]) => ({

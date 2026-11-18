@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { normalizarCuenta, descargarPdf } from '../../utils/vistasSeguras';
+import { leerSesion } from '../../utils/sesion';
+import usePagoSeguro from '../../hooks/usePagoSeguro';
+import AvisoPagoPendiente from '../../components/AvisoPagoPendiente';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 const EstadoCuentaEstudiante = () => {
+  const { pendiente, enviar, verificar } = usePagoSeguro();
+  const cargaRef = useRef(0);
+  const pagoRef = useRef(false);
+  const [errorCuenta, setErrorCuenta] = useState('');
   const [ciclos, setCiclos] = useState([]);
   const [cicloSeleccionado, setCicloSeleccionado] = useState('');
 
@@ -18,29 +26,24 @@ const EstadoCuentaEstudiante = () => {
   const [showModalPago, setShowModalPago] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pagoExitoso, setPagoExitoso] = useState(false);
-
-  // Estado de la tarjeta
-  const [tarjeta, setTarjeta] = useState({
-    numero: '', mes: '', anio: '', cvv: '', titular: ''
-  });
-
+  const [tarjeta, setTarjeta] = useState({ numero: '', mes: '', anio: '', cvv: '', titular: '' });
   const aniosDisponibles = Array.from({ length: 15 }, (_, i) => new Date().getFullYear() + i);
+  const formatCardNumber = valor => valor.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+  const cerrarModalPago = () => {
+    if (pagoRef.current) return;
+    setShowModalPago(false);
+    setTarjeta({ numero: '', mes: '', anio: '', cvv: '', titular: '' });
+  };
+  const inputClass = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all font-mono';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedId = localStorage.getItem('idEstudiante');
-    if (storedId) setIdEstudiante(storedId);
-
-    if (token) {
-      try {
-        const payload = JSON.parse(window.atob(token.split('.')[1]));
-        if (payload.carnet) {
-          setCarnetEstudiante(payload.carnet);
-        }
-      } catch (error) {
-        toast.error("Sesión inválida.");
-      }
-    }
+    const sesion = leerSesion();
+    const carnet = sesion.payload?.carnet || localStorage.getItem('carnet');
+    if (sesion.valida && carnet) {
+      setCarnetEstudiante(String(carnet));
+      setIdEstudiante(localStorage.getItem('idEstudiante'));
+    } else { setErrorCuenta('No se pudo identificar tu carnet. Vuelve a iniciar sesión.'); setCargando(false); }
+    return () => { cargaRef.current++; };
   }, []);
 
   // Cargar ciclos solo cuando ya tenemos el carnet del estudiante
@@ -57,14 +60,15 @@ const EstadoCuentaEstudiante = () => {
     }
   }, [cicloSeleccionado, carnetEstudiante]);
 
-  const cargarCiclosDisponibles = async () => {
+  async function cargarCiclosDisponibles() {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${carnetEstudiante}/ciclos`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${encodeURIComponent(carnetEstudiante)}/ciclos`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const ciclosEstudiante = await res.json();
+        if (!Array.isArray(ciclosEstudiante)) throw new Error('La lista de ciclos no es válida.');
         setCiclos(ciclosEstudiante);
 
         if (ciclosEstudiante.length > 0) {
@@ -72,32 +76,40 @@ const EstadoCuentaEstudiante = () => {
         } else {
           setCargando(false);
         }
-      }
+      } else { throw new Error(`No se pudieron cargar los ciclos (${res.status}).`); }
     } catch (error) {
+      setErrorCuenta(error.message);
       toast.error('Error al cargar los ciclos');
       setCargando(false);
     }
   };
 
-  const cargarEstadoCuenta = async () => {
+  async function cargarEstadoCuenta() {
+    const carga = ++cargaRef.current;
+    setErrorCuenta('');
+    setDatosCuenta(null);
     setCargando(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${carnetEstudiante}/estado-cuenta/ciclos/${cicloSeleccionado}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${encodeURIComponent(carnetEstudiante)}/estado-cuenta/ciclos/${cicloSeleccionado}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) throw new Error('No se encontraron movimientos financieros para este ciclo.');
+      if (!response.ok) throw new Error(`No se pudo consultar el estado de cuenta (${response.status}). Intenta nuevamente.`);
 
-      const data = await response.json();
+      const data = normalizarCuenta(await response.json());
+      if (!data.resumen || ![data.resumen.deudaTotal, data.resumen.totalPagado, data.resumen.saldoPendiente].every(Number.isFinite)) throw new Error('El resumen financiero no está completo.');
+      if (carga !== cargaRef.current) return;
       if (data.cargosPendientes && data.cargosPendientes.length > 0) {
         data.cargosPendientes.sort((a, b) => new Date(a.fechaVencimiento) - new Date(b.fechaVencimiento));
       }
       setDatosCuenta(data);
     } catch (error) {
+      if (carga !== cargaRef.current) return;
+      setErrorCuenta(error.message);
       setDatosCuenta(null);
     } finally {
-      setCargando(false);
+      if (carga === cargaRef.current) setCargando(false);
     }
   };
 
@@ -111,21 +123,19 @@ const EstadoCuentaEstudiante = () => {
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const fileUrl = URL.createObjectURL(blob);
-        window.open(fileUrl, '_blank');
+        await descargarPdf(response, `comprobante-${idPago}.pdf`);
         toast.success('Documento generado', { id: toastId });
       } else {
         toast.error('Error al generar el documento', { id: toastId });
       }
-    } catch (error) {
+    } catch {
       toast.error('Error de conexión al generar pdf', { id: toastId });
     }
   };
 
   const toggleCargoSelection = (index, isChecked) => {
     const cargos = datosCuenta.cargosPendientes;
-    let nuevos = [];
+    let nuevos;
     if (isChecked) {
       nuevos = cargos.slice(0, index + 1).map(c => c.idCargo);
     } else {
@@ -134,100 +144,61 @@ const EstadoCuentaEstudiante = () => {
     setSelectedCargos(nuevos);
   };
 
-  const formatCardNumber = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || ''
-    let parts = []
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4))
-    }
-    if (parts.length) { return parts.join(' ') } else { return value }
-  };
-
   const totalAPagar = datosCuenta?.cargosPendientes
     ?.filter(c => selectedCargos.includes(c.idCargo))
     .reduce((sum, current) => sum + current.monto, 0) || 0;
 
-  const handleProcesarPagoOnline = async (e) => {
+  const handleProcesarPagoOnline = async e => {
     e.preventDefault();
-    if (tarjeta.numero.replace(/\s/g, '').length !== 16) return toast.error('El número de tarjeta debe tener 16 dígitos');
-    if (!tarjeta.mes || !tarjeta.anio) return toast.error('Seleccione la fecha de vencimiento');
-    if (tarjeta.cvv.length < 3) return toast.error('Cvv inválido');
-    if (!tarjeta.titular.trim()) return toast.error('Ingrese el nombre del titular');
-
-    setIsProcessing(true);
+    if (pagoRef.current || pendiente || pagoExitoso) return;
+    if (!/^\d{16}$/.test(tarjeta.numero.replace(/\s/g, ''))) return toast.error('El número de tarjeta debe tener 16 dígitos.');
+    if (!tarjeta.titular.trim() || tarjeta.titular.trim().length > 150) return toast.error('Ingresa el nombre del titular, con un máximo de 150 caracteres.');
+    const mes = Number(tarjeta.mes);
+    const anio = Number(tarjeta.anio);
+    const ahora = new Date();
+    if (!Number.isInteger(mes) || mes < 1 || mes > 12 || !aniosDisponibles.includes(anio)) return toast.error('Selecciona una fecha de vencimiento válida.');
+    if (anio === ahora.getFullYear() && mes < ahora.getMonth() + 1) return toast.error('La tarjeta está vencida.');
+    if (!/^\d{3,4}$/.test(tarjeta.cvv)) return toast.error('El CVV debe tener 3 o 4 dígitos.');
+    const idValido = Number(datosCuenta?.estudiante?.idEstudiante || idEstudiante);
+    if (!Number.isInteger(idValido) || idValido <= 0 || !selectedCargos.length || !Number.isFinite(totalAPagar) || totalAPagar <= 0) return toast.error('Selecciona cargos válidos antes de continuar.');
+    pagoRef.current = true; setIsProcessing(true);
     try {
-      const token = localStorage.getItem('token');
-
-      const idValido = Number(datosCuenta.estudiante.idEstudiante || idEstudiante);
-
-      if (!idValido || isNaN(idValido)) {
-        throw new Error("No se pudo identificar tu usuario. Por favor, cierra sesión y vuelve a entrar.");
-      }
-
-      const payload = {
-        idEstudiante: idValido,
-        idsCargosAPagar: selectedCargos,
-        arancelesAdicionales: [],
-        montoRecibido: Number(totalAPagar.toFixed(2)),
-        idMetodoPago: 2,
-        numeroReferencia: `ONL-${Date.now().toString().slice(-6)}`
-      };
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/pagos/en-linea`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+      const data = await enviar(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/pagos/en-linea`, {
+        idEstudiante: idValido, idsCargosAPagar: selectedCargos, arancelesAdicionales: [],
+        montoRecibido: Number(totalAPagar.toFixed(2)), idMetodoPago: 2,
+        numeroReferencia: `ONL-${crypto.randomUUID()}`
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.mensaje || data.message || 'El servidor rechazó el pago (Error 400)');
-      }
-
       setPagoExitoso(true);
-      toast.success('¡Pago completado!', { description: `Factura generada: ${data.factura}. Revisa tu correo.` });
-
-      setTimeout(() => {
-        setPagoExitoso(false);
-        setShowModalPago(false);
-        setSelectedCargos([]);
-        setTarjeta({ numero: '', mes: '', anio: '', cvv: '', titular: '' });
-        cargarEstadoCuenta();
-      }, 3000);
-
-    } catch (error) {
-      toast.error('Transacción rechazada', { description: error.message });
-    } finally {
-      setIsProcessing(false);
-    }
+      toast.success('¡Pago completado!', { description: `Comprobante generado: ${data.factura || data.idPago}.` });
+      setSelectedCargos([]); setShowModalPago(false);
+      setTarjeta({ numero: '', mes: '', anio: '', cvv: '', titular: '' });
+      await cargarEstadoCuenta();
+    } catch (error) { toast.error('Revisa el resultado del pago', { description: error.message, duration: 12000 }); }
+    finally { pagoRef.current = false; setIsProcessing(false); }
   };
-
-  const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all font-mono";
 
   return (
     <div className="w-full pb-32 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
+      <AvisoPagoPendiente pendiente={pendiente} verificar={verificar} />
       {/* MODAL DE PAGO EN LÍNEA */}
       {showModalPago && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="titulo-pago" className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto animate-in zoom-in-95 duration-200 relative">
             <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Pago en línea segura</h3>
+                <h3 id="titulo-pago" className="text-lg font-bold text-slate-900">Pago en línea</h3>
+                <p className="mt-1 text-xs text-slate-500">Simulación académica · Usa datos de prueba</p>
                 <p className="text-xs text-slate-500 mt-1">Total a pagar: <strong className="text-emerald-600 text-sm">${totalAPagar.toFixed(2)}</strong></p>
               </div>
-              <button onClick={() => setShowModalPago(false)} disabled={isProcessing} className="p-2 bg-slate-200/50 rounded-full text-slate-500 hover:text-black">
+              <button onClick={cerrarModalPago} aria-label="Cerrar pago" disabled={isProcessing} className="p-2 bg-slate-200/50 rounded-full text-slate-500 hover:text-black">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleProcesarPagoOnline} className="p-6 space-y-4">
+            <form onSubmit={handleProcesarPagoOnline} autoComplete="off" className="p-6">
+              <fieldset disabled={isProcessing || !!pendiente} className="space-y-4">
+              {pendiente && <p role="alert" className="text-sm text-amber-800">Hay un pago pendiente de verificación. Cierra esta ventana y revisa el aviso antes de continuar.</p>}
               <div className="w-full h-40 bg-gradient-to-tr from-slate-900 to-slate-700 rounded-2xl p-5 text-white flex flex-col justify-between shadow-lg relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                 <div className="flex justify-between items-start">
@@ -245,12 +216,12 @@ const EstadoCuentaEstudiante = () => {
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Titular de la tarjeta</label>
-                <input type="text" required value={tarjeta.titular} onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value.toUpperCase() })} placeholder="Nombre tal como aparece en la tarjeta" className={`${inputClass} font-sans`} />
+                <input type="text" required maxLength={150} value={tarjeta.titular} onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value.toUpperCase() })} placeholder="Nombre tal como aparece en la tarjeta" className={`${inputClass} font-sans`} />
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Número de tarjeta</label>
-                <input type="text" required maxLength="19" value={tarjeta.numero} onChange={(e) => setTarjeta({ ...tarjeta, numero: formatCardNumber(e.target.value) })} placeholder="0000 0000 0000 0000" className={inputClass} />
+                <input type="text" inputMode="numeric" required maxLength="19" value={tarjeta.numero} onChange={(e) => setTarjeta({ ...tarjeta, numero: formatCardNumber(e.target.value) })} placeholder="0000 0000 0000 0000" className={inputClass} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -269,12 +240,12 @@ const EstadoCuentaEstudiante = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Cvv</label>
-                  <input type="password" required maxLength="4" value={tarjeta.cvv} onChange={(e) => setTarjeta({ ...tarjeta, cvv: e.target.value.replace(/\D/g, '') })} placeholder="•••" className={inputClass} />
+                  <input type="password" inputMode="numeric" required maxLength="4" value={tarjeta.cvv} onChange={(e) => setTarjeta({ ...tarjeta, cvv: e.target.value.replace(/\D/g, '') })} placeholder="•••" className={inputClass} />
                 </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100">
-                <button type="submit" disabled={isProcessing || pagoExitoso} className="w-full bg-black text-white py-4 rounded-xl font-bold transition-all flex items-center justify-center disabled:opacity-70">
+                <button type="submit" disabled={isProcessing || !!pendiente || pagoExitoso} className="w-full bg-black text-white py-4 rounded-xl font-bold transition-all flex items-center justify-center disabled:opacity-70">
                   {pagoExitoso ? (
                     <><span className="text-emerald-400 mr-2">✓</span> ¡Transacción aprobada!</>
                   ) : isProcessing ? (
@@ -284,6 +255,7 @@ const EstadoCuentaEstudiante = () => {
                   )}
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>
@@ -313,7 +285,8 @@ const EstadoCuentaEstudiante = () => {
             <div className="relative">
               <select
                 value={cicloSeleccionado}
-                onChange={(e) => setCicloSeleccionado(e.target.value)}
+                disabled={isProcessing}
+                onChange={(e) => { cargaRef.current++; setSelectedCargos([]); setPagoExitoso(false); setShowModalPago(false); setCicloSeleccionado(e.target.value); }}
                 className="w-full h-[50px] bg-white text-slate-900 border border-slate-200 rounded-xl px-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm appearance-none cursor-pointer"
               >
                 {ciclos.map(c => (
@@ -332,7 +305,7 @@ const EstadoCuentaEstudiante = () => {
           </div>
         ) : !datosCuenta ? (
           <div className="bg-slate-50 p-12 text-center rounded-2xl border border-slate-200 border-dashed">
-            <p className="text-slate-500 font-medium">No se encontraron movimientos financieros para el ciclo seleccionado.</p>
+            <p className="text-slate-500 font-medium">{errorCuenta || 'No hay movimientos disponibles para el ciclo seleccionado.'}</p>
           </div>
         ) : (
           <>
@@ -388,7 +361,7 @@ const EstadoCuentaEstudiante = () => {
 
                               <div className="text-right">
                                 <span className="font-extrabold text-lg text-slate-900">${cargo.monto.toFixed(2)}</span>
-                                {cargo.montoRecargo > 0 && (
+                                {cargo.montoRecargo > 0 && Number.isFinite(cargo.montoBase) && (
                                   <span className="block text-[10px] text-red-500 font-bold uppercase mt-1 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">
                                     Base: ${cargo.montoBase.toFixed(2)} + Mora: ${cargo.montoRecargo.toFixed(2)}
                                   </span>
@@ -458,7 +431,7 @@ const EstadoCuentaEstudiante = () => {
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
                       <p className="text-2xl font-extrabold text-emerald-400">${totalAPagar.toFixed(2)}</p>
                     </div>
-                    <button onClick={() => setShowModalPago(true)} className="bg-white text-black px-6 py-3 rounded-xl font-extrabold hover:bg-gray-100 transition-colors">
+                    <button onClick={() => { setPagoExitoso(false); setShowModalPago(true); }} className="bg-white text-black px-6 py-3 rounded-xl font-extrabold hover:bg-gray-100 transition-colors">
                       Pagar en línea
                     </button>
                   </div>

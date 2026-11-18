@@ -1,3 +1,4 @@
+import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -81,20 +82,9 @@ const esTelefonoValido = (telefono) => {
   return inicial === '2' || inicial === '6' || inicial === '7';
 };
 
-const esCorreoValido = (correo) => {
-  const limpio = String(correo || '').trim();
-  if (!limpio || limpio.includes(' ')) return false;
-  const arroba = limpio.indexOf('@');
-  if (arroba <= 0) return false;
-  const punto = limpio.lastIndexOf('.');
-  return punto > arroba + 1 && punto < limpio.length - 1;
-};
+const esCorreoValido = correo => validarCorreoRegistro(correo) === '';
 
-const calcularFechaMaxima = (edadMinima) => {
-  const hoy = new Date();
-  hoy.setFullYear(hoy.getFullYear() - edadMinima);
-  return hoy.toISOString().split('T')[0];
-};
+const calcularFechaMaxima = edadMinima => limitesFechaNacimiento(edadMinima).max;
 
 function SelectBuscador({
   label,
@@ -126,7 +116,7 @@ function SelectBuscador({
   }, [disabled]);
 
   const filtrados = options.filter(item =>
-    (item.nombre || '').toLowerCase().includes(search.toLowerCase())
+    normalizarBusqueda(item.nombre).includes(normalizarBusqueda(search))
   );
 
   const seleccionado = options.find(
@@ -578,12 +568,20 @@ function RegistroDocente() {
     : esPasaporteValido(alfanumDocActual)
   );
 
+  const errorCorreo = validarCorreoRegistro(formData.correoPersonal);
+  const errorNacimiento = validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
+  const validarContactoNacimiento = () => {
+    const mensaje = validarCorreoRegistro(formData.correoPersonal) || validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
+    if (mensaje) { toast.warning('Revisa los datos personales', { description: mensaje }); return false; }
+    return true;
+  };
+
   const c1 = [
     String(formData.nombres || '').trim() !== '',
     String(formData.apellidos || '').trim() !== '',
     String(formData.idTipoDocumento || '').trim() !== '',
     docValido,
-    String(formData.fechaNacimiento || '').trim() !== '',
+    !errorNacimiento,
     String(formData.sexo || '').trim() !== ''
   ].filter(Boolean).length;
 
@@ -605,6 +603,7 @@ function RegistroDocente() {
 
   const handlePreSubmit = (e) => {
     e.preventDefault();
+    if (!validarContactoNacimiento()) return;
     if (!documentoVerificado || esDocenteActivo) return;
 
     if (!esTelefonoValido(formData.telefono)) {
@@ -621,6 +620,7 @@ function RegistroDocente() {
   };
 
   const handleConfirmarRegistro = async () => {
+    if (isLoading || !validarContactoNacimiento()) return;
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -924,7 +924,7 @@ function RegistroDocente() {
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">Fecha nacimiento</label>
                     </div>
-                    <input
+                    <input aria-invalid={Boolean(formData.fechaNacimiento && errorNacimiento)} aria-describedby={formData.fechaNacimiento && errorNacimiento ? "error-nacimiento" : undefined} min={limitesFechaNacimiento().min}
                       type="date"
                       value={formData.fechaNacimiento}
                       onChange={(e) => setFormData(prev => ({ ...prev, fechaNacimiento: e.target.value }))}
@@ -933,6 +933,7 @@ function RegistroDocente() {
                       disabled={!documentoVerificado || personaExistente}
                       className={inputClassName}
                     />
+                    {formData.fechaNacimiento && errorNacimiento && <p id="error-nacimiento" role="alert" className="mt-1.5 text-xs text-red-600">{errorNacimiento}</p>}
                   </div>
                   <div>
                     <SelectBuscador
@@ -972,7 +973,7 @@ function RegistroDocente() {
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">Correo personal</label>
                     </div>
-                    <input
+                    <input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={254}
                       type="email"
                       value={formData.correoPersonal}
                       onChange={(e) => setFormData(prev => ({ ...prev, correoPersonal: e.target.value.toLowerCase().trim() }))}
@@ -981,6 +982,7 @@ function RegistroDocente() {
                       className={inputClassName}
                       placeholder="juan@gmail.com"
                     />
+                    {formData.correoPersonal && errorCorreo && <p id="error-correo" role="alert" className="mt-1.5 text-xs text-red-600">{errorCorreo}</p>}
                   </div>
 
                   <div>
