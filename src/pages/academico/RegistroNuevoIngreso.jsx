@@ -1,3 +1,4 @@
+import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -68,20 +69,9 @@ const esTelefonoValido = (telefono) => {
   return ['2', '6', '7'].includes(digitos[0]);
 };
 
-const esCorreoValido = (correo) => {
-  const limpio = String(correo || '').trim();
-  if (!limpio || limpio.includes(' ')) return false;
-  const arroba = limpio.indexOf('@');
-  if (arroba <= 0) return false;
-  const punto = limpio.lastIndexOf('.');
-  return punto > arroba + 1 && punto < limpio.length - 1;
-};
+const esCorreoValido = correo => validarCorreoRegistro(correo) === '';
 
-const calcularFechaMaxima = (edadMinima) => {
-  const hoy = new Date();
-  hoy.setFullYear(hoy.getFullYear() - edadMinima);
-  return hoy.toISOString().split('T')[0];
-};
+const calcularFechaMaxima = edadMinima => limitesFechaNacimiento(edadMinima).max;
 
 const obtenerSedeDesdeToken = () => {
   try {
@@ -128,7 +118,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
 
   const filtrados = options.filter(item => {
     const nombreItem = item.nombre || item.nombreCarrera || item.nombreSede || '';
-    return nombreItem.toLowerCase().includes(search.toLowerCase());
+    return normalizarBusqueda(nombreItem).includes(normalizarBusqueda(search));
   });
 
   const seleccionado = options.find(item => {
@@ -560,8 +550,17 @@ export default function RegistroNuevoIngreso() {
     });
   };
 
+  const errorCorreo = validarCorreoRegistro(formData.correoPersonal);
+  const errorNacimiento = validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
+  const validarContactoNacimiento = () => {
+    const mensaje = validarCorreoRegistro(formData.correoPersonal) || validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
+    if (mensaje) { toast.warning('Revisa los datos personales', { description: mensaje }); return false; }
+    return true;
+  };
+
   const handlePreSubmit = (e) => {
     e.preventDefault();
+    if (!validarContactoNacimiento()) return;
     if (personaExistente) return;
     if (!esTelefonoValido(formData.telefono)) {
       toast.warning('Teléfono inválido', { description: 'El número telefónico debe tener 8 dígitos e iniciar con 2, 6 o 7.' });
@@ -575,6 +574,7 @@ export default function RegistroNuevoIngreso() {
   };
 
   const handleConfirmar = async () => {
+    if (isLoading || !validarContactoNacimiento()) return;
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -680,7 +680,7 @@ export default function RegistroNuevoIngreso() {
     : esPasaporteValido(alfanumDocActual)
   );
 
-  const c1 = [formData.nombres, formData.apellidos, formData.idTipoDocumento, docValido, formData.fechaNacimiento, formData.sexo].filter(Boolean).length;
+  const c1 = [formData.nombres, formData.apellidos, formData.idTipoDocumento, docValido, !errorNacimiento, formData.sexo].filter(Boolean).length;
   const c2 = [esTelefonoValido(formData.telefono), esCorreoValido(formData.correoPersonal), formData.idDepartamento, formData.idDistrito, formData.direccion].filter(Boolean).length;
   const c3 = [formData.idSede, formData.idCarreraSede, formData.idPensum, formData.idGruposSeleccionados.length > 0].filter(Boolean).length;
 
@@ -796,10 +796,12 @@ export default function RegistroNuevoIngreso() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
               <div><label className={labelClass}>Nombres</label><input required type="text" disabled={personaExistente} value={formData.nombres} onChange={e => setFormData(p => ({...p, nombres: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. JUAN CARLOS" /></div>
               <div><label className={labelClass}>Apellidos</label><input required type="text" disabled={personaExistente} value={formData.apellidos} onChange={e => setFormData(p => ({...p, apellidos: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. PEREZ GARCIA" /></div>
-              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label></div><input required type="date" disabled={personaExistente} max={maxFechaNacimiento} value={formData.fechaNacimiento} onChange={e => setFormData(p => ({...p, fechaNacimiento: e.target.value}))} className={inputClass} /></div>
+              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label></div><input aria-invalid={Boolean(formData.fechaNacimiento && errorNacimiento)} aria-describedby={formData.fechaNacimiento && errorNacimiento ? "error-nacimiento" : undefined} min={limitesFechaNacimiento().min} required type="date" disabled={personaExistente} max={maxFechaNacimiento} value={formData.fechaNacimiento} onChange={e => setFormData(p => ({...p, fechaNacimiento: e.target.value}))} className={inputClass} />
+                    {formData.fechaNacimiento && errorNacimiento && <p id="error-nacimiento" role="alert" className="mt-1.5 text-xs text-red-600">{errorNacimiento}</p>}</div>
               <div><SelectBuscador label="Sexo" value={formData.sexo} onChange={v => setFormData(p => ({...p, sexo: v}))} options={[{id: 'M', nombre: 'Masculino'}, {id: 'F', nombre: 'Femenino'}]} placeholder="-- Seleccione --" disabled={personaExistente} /></div>
               <div><div className="h-5 mb-1.5 ml-1 flex items-center justify-between"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Teléfono</label>{formData.telefono && !['2', '6', '7'].includes(formData.telefono.charAt(0)) && (<span className="text-[10px] font-bold text-red-600">Debe iniciar con 2, 6 o 7</span>)}</div><input required type="tel" maxLength={9} disabled={personaExistente} value={formData.telefono} onChange={e => handleTelefonoChange(e.target.value)} className={inputClass} placeholder="7000-0000" /></div>
-              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label></div><input required type="email" disabled={personaExistente} value={formData.correoPersonal} onChange={e => setFormData(p => ({...p, correoPersonal: e.target.value.toLowerCase().trim()}))} className={inputClass} placeholder="juan@gmail.com" /></div>
+              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label></div><input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={254} required type="email" disabled={personaExistente} value={formData.correoPersonal} onChange={e => setFormData(p => ({...p, correoPersonal: e.target.value.toLowerCase().trim()}))} className={inputClass} placeholder="juan@gmail.com" />
+                    {formData.correoPersonal && errorCorreo && <p id="error-correo" role="alert" className="mt-1.5 text-xs text-red-600">{errorCorreo}</p>}</div>
             </div>
           </div>
 

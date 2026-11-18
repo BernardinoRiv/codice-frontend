@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { normalizarCuenta, numeroMonetario, descargarPdf } from '../../utils/vistasSeguras';
+import usePagoSeguro from '../../hooks/usePagoSeguro';
+import AvisoPagoPendiente from '../../components/AvisoPagoPendiente';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 function VentanillaPagos() {
+  const { pendiente, enviar, verificar } = usePagoSeguro();
+  const busquedaRef = useRef(0);
+  const pagoRef = useRef(false);
+  useEffect(() => () => { busquedaRef.current++; }, []);
   const [carnetBuscar, setCarnetBuscar] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -30,20 +37,23 @@ function VentanillaPagos() {
     cargarPagosDeHoy();
   }, []);
 
-  const cargarPagosDeHoy = async () => {
+  async function cargarPagosDeHoy() {
     setCargandoHoy(true);
     try {
       const token = localStorage.getItem('token');
-      const fechaHoy = new Date().toLocaleDateString('en-CA'); 
+      const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/El_Salvador' });
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/historial?fecha=${fechaHoy}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
+        if (!Array.isArray(data)) throw new Error('Historial inválido');
         setPagosHoy(data);
+      } else {
+        throw new Error(`No se pudo cargar el historial (${response.status}).`);
       }
     } catch (error) {
-      console.error("Error al cargar pagos de hoy:", error);
+      toast.error('No se pudo actualizar el historial', { description: error.message });
     } finally {
       setCargandoHoy(false);
     }
@@ -66,7 +76,7 @@ function VentanillaPagos() {
         day: '2-digit', month: 'short', year: 'numeric', 
         hour: '2-digit', minute: '2-digit', hour12: true 
       }).format(date);
-    } catch (error) {
+    } catch {
       return 'Fecha inválida';
     }
   };
@@ -85,14 +95,12 @@ function VentanillaPagos() {
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const fileUrl = URL.createObjectURL(blob);
-        window.open(fileUrl, '_blank');
-        toast.success('Factura abierta', { id: toastId });
+        await descargarPdf(response, `comprobante-${idPago}.pdf`);
+        toast.success('Factura descargada', { id: toastId });
       } else {
         toast.error('No se pudo generar el PDF de la factura', { id: toastId });
       }
-    } catch (error) {
+    } catch {
       toast.error('Error de conexión al generar PDF', { id: toastId });
     }
   };
@@ -113,7 +121,7 @@ function VentanillaPagos() {
       } else {
         toast.error(data.mensaje || data.error || data.message || 'Error al enviar correo', { id: toastId });
       }
-    } catch (error) {
+    } catch {
       toast.error('Error de conexión con el servidor', { id: toastId });
     } finally {
       setReenviandoId(null);
@@ -130,7 +138,9 @@ function VentanillaPagos() {
       });
       if (res.ok) {
         const data = await res.json();
-        setCatalogoAranceles(data.sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        if (!Array.isArray(data)) throw new Error('Catálogo inválido');
+        setCatalogoAranceles(data.map(a => ({ ...a, nombre: String(a.nombre ?? ''), monto: numeroMonetario(a.monto) })).sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      } else { throw new Error(`No se pudo cargar el catálogo (${res.status}).`);
       }
     } catch (error) {
       toast.error('Error del catálogo', { description: error.message });
@@ -145,7 +155,8 @@ function VentanillaPagos() {
 
   const buscarEstudiante = async (e) => {
     if (e) e.preventDefault();
-    if (!carnetBuscar.trim()) return;
+    if (!carnetBuscar.trim() || pagoRef.current) return;
+    const busqueda = ++busquedaRef.current;
 
     setIsSearching(true);
     setEstadoCuenta(null);
@@ -157,12 +168,13 @@ function VentanillaPagos() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${carnetBuscar}/estado-cuenta`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/estudiantes/${encodeURIComponent(carnetBuscar.trim())}/estado-cuenta`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = normalizarCuenta(await response.json());
+        if (busqueda !== busquedaRef.current) return;
         if (data.cargosPendientes && data.cargosPendientes.length > 0) {
           data.cargosPendientes.sort((a, b) => {
             const isMatA = a.concepto.toLowerCase().includes('matrícul') || a.concepto.toLowerCase().includes('matricul');
@@ -193,12 +205,13 @@ function VentanillaPagos() {
           toast.success('Solvente', { description: 'El estudiante no posee deudas pendientes.' });
         }
       } else {
-        toast.error('No encontrado', { description: 'No existe el estudiante.' });
+        if (busqueda !== busquedaRef.current) return;
+        toast.error(response.status === 404 ? 'Estudiante no encontrado' : 'No se pudo consultar el estudiante', { description: response.status === 403 ? 'No tienes permisos para esta consulta.' : `Respuesta del servidor: ${response.status}.` });
       }
     } catch (error) {
       toast.error('Error de conexión', { description: error.message });
     } finally {
-      setIsSearching(false);
+      if (busqueda === busquedaRef.current) setIsSearching(false);
     }
   };
 
@@ -244,29 +257,24 @@ function VentanillaPagos() {
   };
 
   const handleProcesarPago = async () => {
+    if (pagoRef.current || pendiente || pagoExitoso) return;
+    if (!estadoCuenta?.estudiante?.idEstudiante || !Number.isFinite(totalAPagar) || totalAPagar <= 0) return toast.error('El total del cobro no es válido.');
     if (totalItemsCobrar === 0) return toast.warning('Sin selección', { description: 'Seleccione o agregue al menos un arancel.' });
     if ((metodoPago === '2' || metodoPago === '3') && !referencia.trim()) return toast.warning('Falta referencia', { description: 'Ingrese el voucher.' });
 
+    pagoRef.current = true;
     setIsProcessing(true);
     try {
-      const token = localStorage.getItem('token');
       const payload = {
         idEstudiante: estadoCuenta.estudiante.idEstudiante,
         idsCargosAPagar: selectedCargos, 
         arancelesAdicionales: arancelesAgregados.map(a => a.idConcepto), 
-        montoRecibido: totalAPagar,
+        montoRecibido: Number(totalAPagar.toFixed(2)),
         idMetodoPago: parseInt(metodoPago),
-        numeroReferencia: referencia || 'PAGO-EFECTIVO'
+        numeroReferencia: referencia.trim() || `EFECTIVO-${crypto.randomUUID()}`
       };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/procesar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.mensaje || data.message || 'Error al procesar el cobro');
+      const data = await enviar(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/procesar`, payload);
 
       toast.success('Cobro exitoso', { description: `Factura generada: ${data.factura}` });
       setPagoExitoso(true);
@@ -277,21 +285,11 @@ function VentanillaPagos() {
       
       cargarPagosDeHoy();
       
-      setTimeout(() => {
-        setEstadoCuenta(null);
-        setSelectedCargos([]);
-        setCargosObligatorios([]);
-        setArancelesAgregados([]);
-        setCarnetBuscar('');
-        setMetodoPago('1');
-        setReferencia('');
-        setPagoExitoso(false);
-        setUltimoPagoRegistrado(null);
-      }, 6000);
 
     } catch (error) {
-      toast.error('Error en el cobro', { description: error.message });
+      toast.error('Revisa el resultado del cobro', { description: error.message, duration: 12000 });
     } finally {
+      pagoRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -302,6 +300,7 @@ function VentanillaPagos() {
   return (
     <div className="w-full max-w-7xl pb-20 font-sans text-gray-900 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       
+      <AvisoPagoPendiente pendiente={pendiente} verificar={verificar} />
       <div className="mb-10">
         <h1 className="text-3xl font-inter font-extrabold tracking-tight mb-1">Ventanilla de pagos</h1>
         <p className="text-gray-500 text-sm">Cobro de aranceles, colegiaturas y emisión de comprobantes.</p>
@@ -425,7 +424,7 @@ function VentanillaPagos() {
                   <div className="flex justify-between items-center border-t border-gray-200 pt-2 mt-2"><span className="text-base font-bold text-gray-900">Total a cobrar:</span><span className="text-2xl font-black text-[#2E7D32]">{formatCurrency(totalAPagar)}</span></div>
                 </div>
 
-                <button onClick={handleProcesarPago} disabled={isProcessing || totalItemsCobrar === 0 || pagoExitoso} className="w-full relative overflow-hidden bg-black text-white py-4 rounded-[14px] font-semibold transition-all disabled:cursor-not-allowed group">
+                <button onClick={handleProcesarPago} disabled={isProcessing || !!pendiente || totalItemsCobrar === 0 || pagoExitoso} className="w-full relative overflow-hidden bg-black text-white py-4 rounded-[14px] font-semibold transition-all disabled:cursor-not-allowed group">
                   <div className={`flex items-center justify-center gap-2 transition-all duration-300 ${isProcessing || pagoExitoso ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
                     Procesar cobro
                     <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>

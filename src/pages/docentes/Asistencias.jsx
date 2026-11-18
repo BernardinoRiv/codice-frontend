@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { normalizarBusqueda } from '../../utils/validacionesRegistro';
+import { leerSesion } from '../../utils/sesion';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -20,7 +22,7 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  const filtrados = options.filter(item => (item.nombre || '').toLowerCase().includes(search.toLowerCase()));
+  const filtrados = options.filter(item => normalizarBusqueda(item.nombre).includes(normalizarBusqueda(search)));
   const seleccionado = options.find(item => String(item.id) === String(value));
 
   const handleLimpiar = (e) => {
@@ -121,6 +123,13 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
 }
 
 const Asistencias = () => {
+  const [errorSincronizacion, setErrorSincronizacion] = useState('');
+  const sincronizacionRef = useRef(null);
+  const inscripcionesRef = useRef(0);
+  const historialRef = useRef(0);
+  const accionClaseRef = useRef(false);
+  const sesion = leerSesion();
+  const claveClase = `codice.asistencia.${sesion.payload?.idUsuario ?? sesion.payload?.sub}.${sesion.payload?.idSesion ?? sesion.payload?.iat}`;
   const [pestanaActiva, setPestanaActiva] = useState('toma');
   const [grupos, setGrupos] = useState([]);
   const [grupoSeleccionado, setGrupoSeleccionado] = useState(null);
@@ -137,7 +146,7 @@ const Asistencias = () => {
   
   const [modalFaltantesAbierto, setModalFaltantesAbierto] = useState(false);
   const [listaFaltantes, setListaFaltantes] = useState([]);
-  const [porcentajeAsistencia, setPorcentajeAsistencia] = useState(0);
+  const porcentajeAsistencia = inscripciones.length ? Math.min(100, presentes.length / inscripciones.length * 100) : 0;
   
   const [cargandoManual, setCargandoManual] = useState(null);
   
@@ -157,25 +166,21 @@ const Asistencias = () => {
   const fechaHoy = getFechaHoy();
 
   useEffect(() => {
-    cargarGrupos();
-
-    const claseGuardada = localStorage.getItem('claseActivaSRA');
-    const grupoGuardado = localStorage.getItem('grupoSeleccionadoSRA');
-    const inicioGuardado = localStorage.getItem('inicioClaseSRA');
-
-    if (claseGuardada && grupoGuardado) {
-      setClaseActiva(Number(claseGuardada));
-      setGrupoSeleccionado(Number(grupoGuardado));
-
-      if (inicioGuardado) {
-        const transcurrido = Math.floor((Date.now() - Number(inicioGuardado)) / 1000);
-        setTiempoTranscurrido(transcurrido > 0 ? transcurrido : 0);
+    let vigente = true;
+    ['claseActivaSRA', 'grupoSeleccionadoSRA', 'inicioClaseSRA'].forEach(key => localStorage.removeItem(key));
+    (async () => {
+      const disponibles = await cargarGrupos();
+      if (!vigente || !disponibles) return;
+      const clase = Number(sessionStorage.getItem(`${claveClase}.claseActivaSRA`));
+      const grupo = Number(sessionStorage.getItem(`${claveClase}.grupoSeleccionadoSRA`));
+      const inicio = Number(sessionStorage.getItem(`${claveClase}.inicioClaseSRA`));
+      if (clase > 0 && disponibles.some(item => Number(item.idGrupo) === grupo)) {
+        setGrupoSeleccionado(grupo); setClaseActiva(clase);
+        setTiempoTranscurrido(inicio > 0 ? Math.max(0, Math.floor((Date.now() - inicio) / 1000)) : 0);
+        cargarInscripciones(grupo);
       }
-
-      cargarInscripciones(Number(grupoGuardado));
-    }
-
-    return () => limpiarIntervalos();
+    })();
+    return () => { vigente = false; inscripcionesRef.current++; historialRef.current++; limpiarIntervalos(); };
   }, []);
 
   useEffect(() => {
@@ -194,9 +199,9 @@ const Asistencias = () => {
   useEffect(() => {
     if (inscripciones.length > 0) {
       const porcentaje = (presentes.length / inscripciones.length) * 100;
-      setPorcentajeAsistencia(porcentaje);
 
-      if (porcentaje === 100 && !finalizando && !modalFaltantesAbierto && claseActiva) {
+
+      if (!errorSincronizacion && porcentaje === 100 && !finalizando && !modalFaltantesAbierto && claseActiva) {
         autoCierreRef.current = setTimeout(() => {
           toast.success('¡Todos los estudiantes están presentes!', { description: 'Cerrando la toma de asistencia automáticamente...' });
           finalizarClase([]);
@@ -206,55 +211,61 @@ const Asistencias = () => {
     return () => {
       if (autoCierreRef.current) clearTimeout(autoCierreRef.current);
     };
-  }, [presentes, inscripciones, claseActiva, finalizando, modalFaltantesAbierto]);
+  }, [presentes, inscripciones, claseActiva, finalizando, modalFaltantesAbierto, errorSincronizacion]);
 
-  const limpiarIntervalos = () => {
+  function limpiarIntervalos() {
+    sincronizacionRef.current?.abort();
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (tokenIntervalRef.current) clearInterval(tokenIntervalRef.current);
     if (presentesIntervalRef.current) clearInterval(presentesIntervalRef.current);
   };
 
-  const iniciarIntervalos = () => {
+  function iniciarIntervalos() {
     limpiarIntervalos();
-    
+    const controller = new AbortController();
+    sincronizacionRef.current = controller;
+    const fallos = new Set();
     timerIntervalRef.current = setInterval(() => {
-      setTiempoTranscurrido(prev => prev + 1);
+      const inicio = Number(sessionStorage.getItem(`${claveClase}.inicioClaseSRA`));
+      if (inicio > 0) setTiempoTranscurrido(Math.max(0, Math.floor((Date.now() - inicio) / 1000)));
     }, 1000);
-
-    const obtenerToken = async () => {
+    const consultar = async (tipo, intervalo, referencia) => {
+      if (controller.signal.aborted) return;
+      const peticion = new AbortController();
+      const cancelar = () => peticion.abort();
+      controller.signal.addEventListener('abort', cancelar, { once: true });
+      const timeout = setTimeout(cancelar, 15000);
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/asistencia/token-qr/${claseActiva}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/asistencia/${tipo}/${claseActiva}`, { signal: peticion.signal });
+        if (!response.ok) throw new Error(`Error ${response.status}`);
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        if (tipo === 'token-qr') {
+          if (!data.token) throw new Error('Código no disponible');
           setTokenActual(data.token);
+        } else {
+          if (!Array.isArray(data.presentes)) throw new Error('Lista no válida');
+          setPresentes(data.presentes);
         }
-      } catch (error) {}
-    };
-
-    const consultarPresentes = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/asistencia/presentes/${claseActiva}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setPresentes(data.presentes || []);
+        fallos.delete(tipo);
+      } catch {
+        if (controller.signal.aborted) return;
+        fallos.add(tipo);
+        if (tipo === 'token-qr') setTokenActual('');
+      } finally {
+        clearTimeout(timeout);
+        controller.signal.removeEventListener('abort', cancelar);
+        if (!controller.signal.aborted) {
+          setErrorSincronizacion(fallos.size ? 'No se pudo actualizar la asistencia. Los datos pueden estar desactualizados; se volverá a intentar automáticamente.' : '');
+          referencia.current = setTimeout(() => consultar(tipo, intervalo, referencia), intervalo);
         }
-      } catch (error) {}
+      }
     };
-
-    obtenerToken();
-    consultarPresentes();
-    
-    tokenIntervalRef.current = setInterval(obtenerToken, 10000);
-    presentesIntervalRef.current = setInterval(consultarPresentes, 2000);
+    consultar('token-qr', 10000, tokenIntervalRef);
+    consultar('presentes', 3000, presentesIntervalRef);
   };
 
-  const cargarGrupos = async () => {
+  async function cargarGrupos() {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/docentes/grupos`, {
@@ -263,25 +274,30 @@ const Asistencias = () => {
           'Accept': 'application/json'
         }
       });
-      if (response.ok) setGrupos(await response.json());
+      if (response.ok) { const data = await response.json(); if (!Array.isArray(data)) throw new Error('Lista inválida'); setGrupos(data); return data; }
       else toast.error('No se pudieron cargar los grupos');
     } catch (error) {
       toast.error('Error de conexión', { description: error.message });
     }
   };
 
-  const cargarInscripciones = async (idGrupo) => {
+  async function cargarInscripciones(idGrupo) {
+    const solicitud = ++inscripcionesRef.current;
+    setInscripciones([]);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/grupos/${idGrupo}/inscripciones`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) setInscripciones(await response.json());
-    } catch (error) {}
+      if (!response.ok) throw new Error('No se pudo cargar la lista');
+      const data = await response.json();
+      if (solicitud === inscripcionesRef.current && Array.isArray(data)) setInscripciones(data);
+    } catch { if (solicitud === inscripcionesRef.current) toast.error('No se pudo cargar la lista de estudiantes.'); }
   };
 
-  const cargarHistorial = async () => {
+  async function cargarHistorial() {
     if (!grupoSeleccionado) return;
+    const solicitud = ++historialRef.current;
     setCargando(true);
     try {
       const token = localStorage.getItem('token');
@@ -292,20 +308,22 @@ const Asistencias = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setHistorial(data);
+        if (solicitud === historialRef.current && Array.isArray(data)) setHistorial(data);
       }
     } catch (error) {
       toast.error('Error al cargar historial', { description: error.message });
     } finally {
-      setCargando(false);
+      if (solicitud === historialRef.current) setCargando(false);
     }
   };
 
   const iniciarClase = async () => {
+    if (accionClaseRef.current) return;
     if (!grupoSeleccionado) {
       toast.error('Selecciona un grupo primero');
       return;
     }
+    accionClaseRef.current = true;
     setIniciando(true);
     try {
       const token = localStorage.getItem('token');
@@ -320,9 +338,9 @@ const Asistencias = () => {
         setPresentes([]);
         setBusquedaListaManual(''); // Limpiamos el buscador al iniciar
         
-        localStorage.setItem('claseActivaSRA', data.idClase);
-        localStorage.setItem('grupoSeleccionadoSRA', grupoSeleccionado);
-        localStorage.setItem('inicioClaseSRA', Date.now());
+        sessionStorage.setItem(`${claveClase}.claseActivaSRA`,  data.idClase);
+        sessionStorage.setItem(`${claveClase}.grupoSeleccionadoSRA`,  grupoSeleccionado);
+        sessionStorage.setItem(`${claveClase}.inicioClaseSRA`,  Date.now());
 
         await cargarInscripciones(grupoSeleccionado);
         toast.success('Clase iniciada. Muestra el código QR a los estudiantes.');
@@ -332,6 +350,7 @@ const Asistencias = () => {
     } catch (error) {
       toast.error('Error al iniciar clase', { description: error.message });
     } finally {
+      accionClaseRef.current = false;
       setIniciando(false);
     }
   };
@@ -367,7 +386,7 @@ const Asistencias = () => {
       } else {
         toast.error('No se pudo registrar la asistencia manual.');
       }
-    } catch (error) {
+    } catch {
       toast.error('Error de conexión');
     } finally {
       setCargandoManual(null);
@@ -406,8 +425,9 @@ const Asistencias = () => {
     setListaFaltantes(prev => prev.map(f => f.idInscripcion === idInscripcion ? { ...f, estado: nuevoEstado } : f));
   };
 
-  const finalizarClase = async (manualesData = listaFaltantes) => {
-    if (!claseActiva) return;
+  async function finalizarClase(manualesData = listaFaltantes) {
+    if (accionClaseRef.current || !claseActiva) return;
+    accionClaseRef.current = true;
     setFinalizando(true);
     try {
       const token = localStorage.getItem('token');
@@ -424,9 +444,9 @@ const Asistencias = () => {
         const data = await response.json();
         toast.success(data.mensaje || 'Clase finalizada correctamente');
         
-        localStorage.removeItem('claseActivaSRA');
-        localStorage.removeItem('grupoSeleccionadoSRA');
-        localStorage.removeItem('inicioClaseSRA');
+        sessionStorage.removeItem(`${claveClase}.claseActivaSRA`);
+        sessionStorage.removeItem(`${claveClase}.grupoSeleccionadoSRA`);
+        sessionStorage.removeItem(`${claveClase}.inicioClaseSRA`);
 
         setClaseActiva(null);
         setTokenActual('');
@@ -441,6 +461,7 @@ const Asistencias = () => {
     } catch (error) {
       toast.error('Error al finalizar clase', { description: error.message });
     } finally {
+      accionClaseRef.current = false;
       setFinalizando(false);
     }
   };
@@ -503,6 +524,7 @@ const Asistencias = () => {
   if (cargando && grupos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center pt-20">
+      {errorSincronizacion && <div role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{errorSincronizacion}</div>}
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mb-4"></div>
         <p className="text-slate-500 text-sm font-medium tracking-wide">Cargando información...</p>
       </div>
@@ -516,10 +538,10 @@ const Asistencias = () => {
     .filter(insc => !presentes.find(p => String(p.idEstudiante) === String(insc.idEstudiante)))
     .filter(insc => {
       if (!busquedaListaManual.trim()) return true;
-      const query = busquedaListaManual.toLowerCase();
-      const nombreCompleto = `${insc.nombresEstudiante || ''} ${insc.apellidosEstudiante || ''}`.toLowerCase();
-      const carnet = (insc.carnet || '').toLowerCase();
-      return nombreCompleto.includes(query) || carnet.includes(query);
+      const query = normalizarBusqueda(busquedaListaManual);
+      const nombreCompleto = normalizarBusqueda(`${insc.nombresEstudiante || ''} ${insc.apellidosEstudiante || ''}`);
+      const carnet = normalizarBusqueda(insc.carnet);
+      return query.split(' ').every(parte => nombreCompleto.includes(parte) || carnet.includes(parte));
     });
 
   return (

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import { notaValida } from '../../utils/vistasSeguras';
+import { leerExcelNotas } from '../../utils/leerExcelNotas';
 
 const IngresoNotas = () => {
   const [grupos, setGrupos] = useState([]);
@@ -21,6 +22,29 @@ const IngresoNotas = () => {
   const [cargandoArchivo, setCargandoArchivo] = useState(false);
   const [descargandoDocumento, setDescargandoDocumento] = useState(false);
   const inputArchivoRef = useRef(null);
+  const cargaRef = useRef(0);
+  const escrituraRef = useRef(false);
+  const archivoRef = useRef(0);
+  const originalesRef = useRef({});
+  const [hayCambios, setHayCambios] = useState(false);
+
+  useEffect(() => () => { cargaRef.current++; archivoRef.current++; }, []);
+  useEffect(() => {
+    const advertir = event => { event.preventDefault(); event.returnValue = ''; };
+    if (hayCambios) window.addEventListener('beforeunload', advertir);
+    return () => window.removeEventListener('beforeunload', advertir);
+  }, [hayCambios]);
+
+  const cambiarGrupo = valor => {
+    if (escrituraRef.current) return;
+    if (hayCambios && !window.confirm('Tienes notas sin guardar. ¿Descartar los cambios y cambiar de grupo?')) return;
+    cargaRef.current++;
+    archivoRef.current++;
+    setInscripciones([]); setEvaluaciones([]); setCalificaciones({});
+    setMostrarModalCarga(false); setArchivoSeleccionado(null); setHayCambios(false);
+    setModoEdicionGlobal(false); setTerminoBusqueda('');
+    setGrupoSeleccionado(valor ? Number(valor) : null);
+  };
 
   useEffect(() => {
     cargarGrupos();
@@ -28,13 +52,11 @@ const IngresoNotas = () => {
 
   useEffect(() => {
     if (grupoSeleccionado) {
-      setModoEdicionGlobal(false);
       cargarDatosGrupo();
-      setTerminoBusqueda('');
     }
   }, [grupoSeleccionado]);
 
-  const cargarGrupos = async () => {
+  async function cargarGrupos() {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/docentes/grupos`, {
@@ -56,7 +78,8 @@ const IngresoNotas = () => {
     }
   };
 
-  const cargarDatosGrupo = async () => {
+  async function cargarDatosGrupo() {
+    const carga = ++cargaRef.current;
     setCargando(true);
     try {
       const token = localStorage.getItem('token');
@@ -74,6 +97,8 @@ const IngresoNotas = () => {
         fetchJson(`${baseUrl}/grupos/${grupoSeleccionado}/calificaciones`)
       ]);
 
+      if (carga !== cargaRef.current) return;
+      if (![inscripcionesData, evaluacionesData, calificacionesData].every(Array.isArray)) throw new Error('Respuesta inválida');
       setInscripciones(inscripcionesData);
       setEvaluaciones(evaluacionesData);
       
@@ -85,12 +110,14 @@ const IngresoNotas = () => {
           nota: calif.nota !== null ? calif.nota.toString() : ''
         };
       });
+      originalesRef.current = califsObj;
       setCalificaciones(califsObj);
+      setHayCambios(false);
 
-    } catch (error) {
-      toast.error('No se pudieron cargar los datos del grupo seleccionado.');
+    } catch {
+      if (carga === cargaRef.current) toast.error('No se pudieron cargar los datos del grupo seleccionado.');
     } finally {
-      setCargando(false);
+      if (carga === cargaRef.current) setCargando(false);
     }
   };
 
@@ -144,12 +171,15 @@ const IngresoNotas = () => {
   const handleNotaChange = (idInscripcion, idEvaluacion, valor) => {
     let val = valor.replace(',', '.');
     if (val !== '') {
-      if (!/^\d*\.?\d{0,1}$/.test(val)) return;
+      if (!/^\d{1,2}(?:\.\d?)?$/.test(val)) return;
       const num = parseFloat(val);
       if (num > 10) val = '10';
       if (num < 0) val = '0';
     }
 
+    if (escrituraRef.current) return;
+    if (!getEstadoEvaluacion(evaluaciones.find(ev => ev.idEvaluacion === idEvaluacion)).puedeEditar) return;
+    setHayCambios(true);
     const key = `${idInscripcion}-${idEvaluacion}`;
     setCalificaciones(prev => ({
       ...prev,
@@ -193,87 +223,69 @@ const IngresoNotas = () => {
     return tieneNotas ? notaFinal.toFixed(1) : '-';
   };
 
-  const guardarCalificaciones = async () => {
-    setGuardando(true);
-    try {
-      const token = localStorage.getItem('token');
-      const calificacionesArray = Object.values(calificaciones)
-        .filter(calif => calif.nota !== null && calif.nota !== '' && calif.estadoCalificacion !== 'PUBLICADA')
-        .map(calif => ({ ...calif, nota: parseFloat(calif.nota) }));
+  const pendientes = () => Object.values(calificaciones).filter(calif => {
+    const original = originalesRef.current[`${calif.idInscripcion}-${calif.idEvaluacion}`];
+    return calif.estadoCalificacion !== 'PUBLICADA' && String(calif.nota ?? '') !== String(original?.nota ?? '');
+  });
 
-      if (calificacionesArray.length === 0) {
-        toast.info('Sin cambios', { description: 'No hay notas nuevas o editadas para guardar.' });
-        setGuardando(false);
-        return;
-      }
-
-      const promesas = calificacionesArray.map(async (calif) => {
+  const guardarPendientes = async () => {
+    const cambios = pendientes();
+    if (cambios.some(calif => !notaValida(calif.nota))) throw new Error('Cada nota editada debe tener un valor de 0 a 10 con máximo un decimal. No se puede borrar una nota guardada desde esta vista.');
+    if (cambios.some(calif => !getEstadoEvaluacion(evaluaciones.find(ev => ev.idEvaluacion === calif.idEvaluacion)).puedeEditar)) throw new Error('Una evaluación editada ya cerró su plazo. Revisa las fechas antes de guardar.');
+    let guardadas = 0;
+    for (const calif of cambios) {
+      try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/calificaciones`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(calif)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idInscripcion: calif.idInscripcion, idEvaluacion: calif.idEvaluacion, nota: Number(calif.nota) })
         });
-        if (!response.ok) throw new Error('Error al guardar');
-        return response.json();
-      });
-
-      await Promise.all(promesas);
-      toast.success('¡Guardado exitoso!', { description: 'Borradores actualizados en el sistema.' });
-      setModoEdicionGlobal(false);
-      cargarDatosGrupo();
-    } catch (error) {
-      toast.error('Error al guardar', { description: error.message });
-    } finally {
-      setGuardando(false);
+        const resultado = await response.text();
+        const data = resultado ? JSON.parse(resultado) : {};
+        if (!response.ok || data.exito === false) throw new Error(data.mensaje || 'El servidor no confirmó el guardado.');
+        originalesRef.current = { ...originalesRef.current, [`${calif.idInscripcion}-${calif.idEvaluacion}`]: { ...calif } };
+        guardadas++;
+      } catch {
+        throw new Error(`Se confirmaron ${guardadas} de ${cambios.length} notas. Se conservaron tus cambios. La última solicitud puede haberse procesado: verifica el registro antes de reintentar. No se publicó ninguna evaluación nueva.`);
+      }
     }
+    setHayCambios(false);
+    return guardadas;
+  };
+
+  const guardarCalificaciones = async () => {
+    if (escrituraRef.current || cargando) return;
+    escrituraRef.current = true; setGuardando(true);
+    try {
+      const cantidad = await guardarPendientes();
+      toast.success(cantidad ? `${cantidad} notas guardadas` : 'Sin cambios pendientes');
+      setModoEdicionGlobal(false);
+    } catch (error) { toast.error('Revisa el guardado', { description: error.message, duration: 12000 }); }
+    finally { escrituraRef.current = false; setGuardando(false); }
   };
 
   const publicarCalificacionesActivas = async () => {
-    const evaluacionesActivas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
-    
-    if (evaluacionesActivas.length === 0) {
-       toast.error('Acción no permitida', { description: 'No hay periodos de evaluación activos actualmente.'});
-       return;
-    }
-
-    if (!confirm('¿Estás seguro de publicar las notas de las evaluaciones activas? Los estudiantes podrán ver las modificaciones.')) return;
-
-    setPublicando(true);
+    if (escrituraRef.current || cargando) return;
+    const activas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
+    if (!activas.length) return toast.error('No hay evaluaciones activas para publicar.');
+    if (!window.confirm('¿Guardar los cambios y publicar las evaluaciones activas? Los estudiantes podrán ver las notas.')) return;
+    escrituraRef.current = true; setPublicando(true);
+    let publicadas = 0;
     try {
-      const token = localStorage.getItem('token');
-      const idsEvaluacionesActivas = evaluacionesActivas.map(ev => ev.idEvaluacion);
-
-      const borradores = Object.values(calificaciones)
-        .filter(calif => idsEvaluacionesActivas.includes(calif.idEvaluacion) && calif.nota !== null && calif.nota !== '' && calif.estadoCalificacion !== 'PUBLICADA')
-        .map(calif => ({ ...calif, nota: parseFloat(calif.nota) }));
-
-      if (borradores.length > 0) {
-        await Promise.all(borradores.map(async (calif) => {
-          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/calificaciones`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(calif)
-          });
-          if (!res.ok) throw new Error('Error en autoguardado preventivo');
-        }));
+      await guardarPendientes();
+      for (const ev of activas) {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/evaluaciones/${ev.idEvaluacion}/publicar`, { method: 'POST' });
+        const texto = await response.text();
+        const data = texto ? JSON.parse(texto) : {};
+        if (!response.ok || data.exito === false) throw new Error('El servidor no confirmó la publicación.');
+        publicadas++;
       }
-
-      await Promise.all(idsEvaluacionesActivas.map(async (idEvaluacion) => {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/evaluaciones/${idEvaluacion}/publicar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error(`Error al publicar la evaluación ${idEvaluacion}`);
-      }));
-
-      toast.success('Publicación exitosa', { description: 'Las calificaciones ya son visibles y actualizadas.' });
+      toast.success('Evaluaciones publicadas');
       setModoEdicionGlobal(false);
-      cargarDatosGrupo();
+      await cargarDatosGrupo();
     } catch (error) {
-      toast.error('Error al publicar', { description: error.message });
-    } finally {
-      setPublicando(false);
-    }
+      toast.error(`Publicación incompleta: ${publicadas} de ${activas.length} confirmadas`, { description: `${error.message} Revisa las notas antes de reintentar.`, duration: 12000 });
+    } finally { escrituraRef.current = false; setPublicando(false); }
   };
 
   const descargarDocumentoNotas = async () => {
@@ -323,7 +335,9 @@ const IngresoNotas = () => {
 
   // Valida la celda cruda de SheetJS para detectar fórmulas, texto o rangos inválidos
   const inspeccionarCeldaExcel = (hoja, rowIndex0Based, colIndex0Based) => {
-    const address = XLSX.utils.encode_cell({ r: rowIndex0Based, c: colIndex0Based });
+    let columna = '';
+    for (let n = colIndex0Based + 1; n > 0; n = Math.floor((n - 1) / 26)) columna = String.fromCharCode(65 + (n - 1) % 26) + columna;
+    const address = `${columna}${rowIndex0Based + 1}`;
     const rawCell = hoja[address];
 
     if (!rawCell || rawCell.t === 'z' || rawCell.v === undefined || rawCell.v === null || String(rawCell.v).trim() === '') {
@@ -366,9 +380,11 @@ const IngresoNotas = () => {
     return { tipo: 'valido', valorNumerico: numVal, valorMostrar: numVal.toFixed(1), motivoError: null };
   };
 
-  const handleArchivoSeleccionado = (e) => {
+  const handleArchivoSeleccionado = async (e) => {
     const archivo = e.target.files?.[0];
-    if (!archivo) return;
+    if (!archivo || escrituraRef.current) return;
+    if (hayCambios) { toast.warning('Guarda tus notas antes de importar un archivo.'); e.target.value = ''; return; }
+    if (archivo.size > 2 * 1024 * 1024) { toast.error('El archivo debe pesar como máximo 2 MB.'); e.target.value = ''; return; }
 
     const extension = archivo.name.split('.').pop().toLowerCase();
     if (!['xlsx', 'xls'].includes(extension)) {
@@ -377,14 +393,12 @@ const IngresoNotas = () => {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellFormula: true });
-        const primerHoja = workbook.Sheets[workbook.SheetNames[0]];
-        const datosJson = XLSX.utils.sheet_to_json(primerHoja, { header: 1 });
-
+    const lectura = ++archivoRef.current;
+    e.target.value = '';
+    setCargandoArchivo(true);
+    try {
+        const { hoja: primerHoja, filas: datosJson } = await leerExcelNotas(archivo);
+        if (lectura !== archivoRef.current) return;
         if (datosJson.length === 0) {
           toast.error('Archivo vacío', { description: 'El archivo no contiene datos.' });
           e.target.value = '';
@@ -423,6 +437,7 @@ const IngresoNotas = () => {
           }
         }
 
+        if (Object.keys(mapaEvaluaciones).length !== evaluaciones.length || evaluaciones.some(ev => mapaEvaluaciones[`${ev.tipoEvaluacion}_${ev.numeroEvaluacion}`] === undefined)) throw new Error('Hay encabezados repetidos o evaluaciones que no corresponden al grupo.');
         const evaluacionesActivas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
         const columnasActivas = evaluacionesActivas.map(ev => {
           const key = `${ev.tipoEvaluacion}_${ev.numeroEvaluacion}`;
@@ -453,6 +468,18 @@ const IngresoNotas = () => {
           return;
         }
 
+        const carnets = new Set();
+        const inscritos = new Set(inscripciones.map(i => String(i.carnet).trim().toLowerCase()));
+        filasConIndice.forEach(({ fila, r }) => {
+          const carnet = String(fila[0]).trim().toLowerCase();
+          if (carnets.has(carnet)) throw new Error(`Carnet duplicado en la fila ${r + 1}.`);
+          if (!inscritos.has(carnet)) throw new Error(`El carnet de la fila ${r + 1} no pertenece al grupo.`);
+          carnets.add(carnet);
+          for (let c = 2; c < primeraFila.length; c++) {
+            const resultado = inspeccionarCeldaExcel(primerHoja, r, c);
+            if (resultado.tipo === 'invalido') throw new Error(`Fila ${r + 1}: ${resultado.motivoError}`);
+          }
+        });
         const columnasConCambios = columnasActivas.filter(col => {
           return filasConIndice.some(({ r, fila }) => {
             const carnetStr = fila[0] ? fila[0].toString().trim().toLowerCase() : '';
@@ -532,12 +559,9 @@ const IngresoNotas = () => {
         setDatosPrevisualizacion(previsualizacion);
         setEvaluacionesEnPrevisualizacion(columnasConCambios.map(c => c.evaluacion));
         setMostrarModalCarga(true);
-      } catch (error) {
-        toast.error('Error al leer el archivo', { description: 'El archivo está corrupto o tiene un formato inválido.' });
-      }
-    };
-    reader.readAsArrayBuffer(archivo);
-    e.target.value = '';
+    } catch (error) {
+      if (lectura === archivoRef.current) toast.error('No se pudo importar el archivo', { description: error.message });
+    } finally { if (lectura === archivoRef.current) setCargandoArchivo(false); }
   };
 
   const hayErroresEnPrevisualizacion = datosPrevisualizacion.some(fila =>
@@ -545,7 +569,8 @@ const IngresoNotas = () => {
   );
 
   const confirmarCarga = async () => {
-    if (!archivoSeleccionado || hayErroresEnPrevisualizacion) return;
+    if (!archivoSeleccionado || hayErroresEnPrevisualizacion || escrituraRef.current) return;
+    escrituraRef.current = true;
 
     setCargandoArchivo(true);
     try {
@@ -564,20 +589,25 @@ const IngresoNotas = () => {
         throw new Error(errorData.message || errorData.error || 'Error al cargar las notas');
       }
 
+      const texto = await response.text();
+      const resultado = texto ? JSON.parse(texto) : {};
+      if (resultado.exito === false) throw new Error(resultado.mensaje || 'El servidor rechazó la carga.');
       toast.success('Notas cargadas exitosamente', { description: 'Los registros fueron procesados correctamente.' });
       setMostrarModalCarga(false);
       setArchivoSeleccionado(null);
       setDatosPrevisualizacion([]);
       setEvaluacionesEnPrevisualizacion([]);
-      cargarDatosGrupo();
+      await cargarDatosGrupo();
     } catch (error) {
-      toast.error('Error al cargar notas', { description: error.message });
+      toast.error('Carga no confirmada', { description: `${error.message}. Verifica las notas antes de volver a enviar el archivo.`, duration: 12000 });
     } finally {
+      escrituraRef.current = false;
       setCargandoArchivo(false);
     }
   };
 
   const cancelarCarga = () => {
+    if (escrituraRef.current) return;
     setMostrarModalCarga(false);
     setArchivoSeleccionado(null);
     setDatosPrevisualizacion([]);
@@ -615,7 +645,8 @@ const IngresoNotas = () => {
             <select
               className="w-full bg-[#F4F4F5] text-gray-900 rounded-xl px-4 py-3.5 appearance-none focus:outline-none focus:ring-2 focus:ring-black/10 transition-all cursor-pointer font-medium text-sm border border-transparent hover:border-gray-200"
               value={grupoSeleccionado || ''}
-              onChange={(e) => setGrupoSeleccionado(Number(e.target.value))}
+              disabled={guardando || publicando || cargandoArchivo}
+              onChange={(e) => cambiarGrupo(e.target.value)}
             >
               <option value="">-- Selecciona un grupo --</option>
               {grupos.map(grupo => (
@@ -749,16 +780,16 @@ const IngresoNotas = () => {
                               const calif = calificaciones[key];
                               
                               const estaPublicada = calif?.estadoCalificacion === 'PUBLICADA';
-                              const estaBloqueado = !estado.puedeEditar || !modoEdicionGlobal || estaPublicada;
+                              const estaBloqueado = guardando || publicando || cargandoArchivo || !estado.puedeEditar || !modoEdicionGlobal || estaPublicada;
                               const tieneNota = calif?.nota !== null && calif?.nota !== undefined && calif?.nota !== '';
                               const esBorrador = tieneNota && !estaPublicada;
 
-                              let colorClass = '';
+                              let colorClass;
                               if (estaPublicada) colorClass = 'bg-green-50 text-green-700';
                               else if (esBorrador) colorClass = 'bg-orange-50 text-orange-700';
                               else colorClass = estaBloqueado ? 'bg-gray-50 text-gray-400' : 'bg-white text-gray-900';
 
-                              let borderClass = '';
+                              let borderClass;
                               if (!estaBloqueado) {
                                 borderClass = 'border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-text';
                               } else {
@@ -820,7 +851,7 @@ const IngresoNotas = () => {
               <button
                 type="button"
                 onClick={guardarCalificaciones}
-                disabled={guardando || !modoEdicionGlobal}
+                disabled={guardando || publicando || cargandoArchivo || !modoEdicionGlobal}
                 className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm w-full sm:w-auto"
               >
                 {guardando ? 'Guardando...' : 'Guardar Borrador'}
@@ -829,7 +860,7 @@ const IngresoNotas = () => {
               <button
                 type="button"
                 onClick={publicarCalificacionesActivas}
-                disabled={publicando || !hayEvaluacionesActivas}
+                disabled={publicando || guardando || cargandoArchivo || !hayEvaluacionesActivas}
                 className="px-6 py-3 bg-white text-gray-900 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm w-full sm:w-auto"
               >
                 {publicando ? 'Publicando...' : 'Publicar Activas'}
