@@ -3,9 +3,12 @@ import { useNavigate, useLocation, Link, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { menuMaestro } from '../config/menuConfig'; 
 import apiInterceptor from '../services/apiInterceptor';
-import SessionGuard from './SessionGuard';
+import useSesion from '../hooks/useSesion';
+import { limpiarSesion } from '../utils/sesion';
+import { PERMISOS_RUTAS } from '../config/permisos';
 
 function DashboardLayout() {
+  const sesion = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -79,16 +82,16 @@ function DashboardLayout() {
   };
 
   const nombreUsuario = obtenerNombreCorto(nombreCompletoRaw);
-  const rolUsuario = localStorage.getItem('rol') || 'DOCENTE';
+  const rolUsuario = sesion.roles[0] || ''; 
   const inicialUsuario = nombreUsuario.charAt(0).toUpperCase();
 
   const confirmLogout = () => {
-    localStorage.clear();
+    limpiarSesion();
     navigate('/');
   };
 
   const rolNormalizado = rolUsuario ? rolUsuario.toUpperCase() : '';
-  const navItems = menuMaestro.filter(item => item.rolesPermitidos.includes(rolNormalizado));
+  const navItems = menuMaestro.filter(item => (PERMISOS_RUTAS[item.path] || []).some(rol => sesion.roles.includes(rol)));
 
   const handleSidebarAction = () => {
     if (isMobile) {
@@ -113,7 +116,7 @@ function DashboardLayout() {
 
   return (
     <div className="flex h-[100dvh] bg-slate-50 font-sans text-slate-900 overflow-hidden relative">
-      <SessionGuard />
+
       <AnimatePresence>
         {isMobile && isMobileOpen && (
           <motion.div

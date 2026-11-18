@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import useSesion from '../../hooks/useSesion';
 
 // Importamos las vistas modulares
 import InicioAdministrador from './InicioAdministrador';
@@ -8,21 +8,8 @@ import InicioEmpleado from './InicioEmpleado';
 import InicioEstudiante from './InicioEstudiante';
 
 export default function Inicio() {
-  const [roles, setRoles] = useState([]);
-  const [nombre, setNombre] = useState('');
-
-  useEffect(() => {
-    const rolGuardado = localStorage.getItem('rol');
-    const nombreGuardado = localStorage.getItem('nombreCompleto');
-
-    if (rolGuardado) setRoles([rolGuardado.toUpperCase()]); 
-    
-    if (nombreGuardado) {
-      setNombre(nombreGuardado.split(' ')[0]);
-    } else {
-      setNombre('Usuario');
-    }
-  }, []);
+  const { roles, nombreCompleto } = useSesion();
+  const nombre = nombreCompleto.split(' ')[0] || 'Usuario';
 
   const renderDashboardPorRol = () => {
     if (roles.includes('ADMINISTRADOR')) return <InicioAdministrador />;

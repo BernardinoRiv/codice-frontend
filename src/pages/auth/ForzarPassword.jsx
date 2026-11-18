@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import imagenFondo from '../../IMG_1534.JPG.jpeg';
 
+import { confirmarCambioPassword, leerSesion, destinoSesion } from '../../utils/sesion';
+
 function ForzarPassword() {
   const navigate = useNavigate();
+  const enviando = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false); 
   const [showPassword, setShowPassword] = useState(false);
@@ -28,16 +31,30 @@ function ForzarPassword() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const generarContrasena = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*+?";
-    let pass = "U" + "m" + "4" + "$"; 
-    for(let i = 0; i < 8; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-    pass = pass.split('').sort(() => 0.5 - Math.random()).join('');
-
+  const generarContrasena = async () => {
+    const grupos = ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz', '0123456789', '!@#$%&*+?'];
+    const elegir = limite => {
+      const buffer = new Uint32Array(1);
+      const maximo = Math.floor(4294967296 / limite) * limite;
+      do { crypto.getRandomValues(buffer); } while (buffer[0] >= maximo);
+      return buffer[0] % limite;
+    };
+    const caracteres = grupos.join('');
+    const partes = grupos.map(g => g[elegir(g.length)]);
+    while (partes.length < 16) partes.push(caracteres[elegir(caracteres.length)]);
+    for (let i = partes.length - 1; i > 0; i--) {
+      const j = elegir(i + 1);
+      [partes[i], partes[j]] = [partes[j], partes[i]];
+    }
+    const pass = partes.join('');
     setFormData(prev => ({ ...prev, nuevaContrasena: pass, confirmarNuevaContrasena: pass }));
     setShowPassword(true);
-    navigator.clipboard.writeText(pass);
-    toast.success('Contraseña Generada', { description: 'Copiada al portapapeles para que no la pierdas.' });
+    try {
+      await navigator.clipboard.writeText(pass);
+      toast.success('Contraseña generada', { description: 'Copiada al portapapeles.' });
+    } catch {
+      toast.info('Contraseña generada', { description: 'Cópiala y guárdala antes de continuar.' });
+    }
   };
 
   const evaluarFuerzaContrasena = (pass) => {
@@ -61,7 +78,8 @@ function ForzarPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid) return;
+    if (!isFormValid || enviando.current) return;
+    enviando.current = true;
     setIsLoading(true);
 
     try {
@@ -71,24 +89,25 @@ function ForzarPassword() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(formData)
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || data.exito === false) {
-        toast.error('Validación fallida', { description: data.mensaje || 'Verifica tu contraseña temporal.' });
+      if (!response.ok || data?.exito !== true) {
+        toast.error('Validación fallida', { description: data?.mensaje || 'El servidor no confirmó el cambio. Verifica tu contraseña temporal.' });
         setIsLoading(false);
         return; 
       }
 
-      localStorage.setItem('ultimoAcceso', new Date().toISOString());
-      setIsSuccess(true); 
-      
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 3000);
+      confirmarCambioPassword(data, token);
+      setIsSuccess(true);
+      setFormData({ contrasenaActual: '', nuevaContrasena: '', confirmarNuevaContrasena: '' });
+      toast.success('Contraseña actualizada', { description: 'Ya puedes acceder al portal.' });
+      navigate(destinoSesion(leerSesion()), { replace: true });
 
     } catch (err) {
-      toast.error('Error de conexión', { description: 'Verifica tu conexión a internet.' });
+      toast.error('Error de conexión', { description: err.message || 'Verifica tu conexión a internet.' });
       setIsLoading(false);
+    } finally {
+      enviando.current = false;
     }
   };
 

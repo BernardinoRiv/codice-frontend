@@ -1,71 +1,43 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-const parseJwt = (token) => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      window.atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    return null;
-  }
-};
+import useSesion from '../hooks/useSesion';
+import { leerSesion, limpiarSesion } from '../utils/sesion';
 
 export default function SessionGuard() {
+  const { token } = useSesion();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
+  const privada = pathname === '/forzar-password' || pathname === '/sin-permisos' ||
+    pathname === '/dashboard' || pathname.startsWith('/dashboard/');
 
   useEffect(() => {
-    const token = localStorage.getItem('token'); 
-    if (!token) return;
-
-    const payload = parseJwt(token);
-    if (!payload || !payload.exp) return;
-
-    const expTime = payload.exp * 1000;
-    const currentTime = Date.now();
-    
-    // Restamos 5 segundos (5000 ms) como margen de seguridad para desincronización
-    const timeLeft = expTime - currentTime - 5000;
-
-    const handleLogout = (motivo) => {
-      localStorage.clear();
-      toast.error('Sesión terminada', { description: motivo });
-      navigate('/', { replace: true }); 
+    if (!privada) return;
+    let timer;
+    const revisar = () => {
+      clearTimeout(timer);
+      const sesion = leerSesion();
+      if (!sesion.valida) {
+        limpiarSesion();
+        navigate('/', { replace: true });
+        if (token) toast.error('Sesión terminada', { id: 'sesion-expirada', description: 'La sesión caducó o no es válida. Vuelve a iniciar sesión.' });
+        return;
+      }
+      const restante = sesion.payload.exp * 1000 - Date.now();
+      if (restante <= 300000) {
+        toast.warning('Tu sesión está por expirar', { id: `sesion-aviso-${sesion.payload.exp}`, description: 'Guarda tu trabajo antes de que termine la sesión.' });
+      }
+      const demora = restante > 300000 ? restante - 300000 : restante;
+      timer = setTimeout(revisar, Math.min(Math.max(demora, 1), 2147483647));
     };
-
-    if (timeLeft <= 0) {
-      handleLogout('Tu sesión ha expirado por inactividad.');
-      return;
-    }
-
-    const warningTime = timeLeft - 300000; // 5 minutos exactos
-    let warningTimer;
-    
-    if (warningTime > 0) {
-      warningTimer = setTimeout(() => {
-        toast.warning('Tu sesión está por expirar', {
-          description: 'Por seguridad, tu sesión se cerrará automáticamente en 5 minutos.',
-          duration: 10000, 
-        });
-      }, warningTime);
-    }
-
-    const logoutTimer = setTimeout(() => {
-      handleLogout('Tu sesión ha caducado. Vuelve a iniciar sesión.');
-    }, Math.max(timeLeft, 0));
-
+    revisar();
+    window.addEventListener('focus', revisar);
+    document.addEventListener('visibilitychange', revisar);
     return () => {
-      clearTimeout(warningTimer);
-      clearTimeout(logoutTimer);
+      clearTimeout(timer);
+      window.removeEventListener('focus', revisar);
+      document.removeEventListener('visibilitychange', revisar);
     };
-  }, [navigate]);
-
-  return null; 
+  }, [token, privada, navigate]);
+  return null;
 }
