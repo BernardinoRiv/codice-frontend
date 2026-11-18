@@ -1,4 +1,10 @@
-import React, { useLayoutEffect, useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useLayoutEffect,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,7 +63,10 @@ function SelectBuscador({
   const triggerRef = useRef(null);
   const [posicion, setPosicion] = useState(null);
   useLayoutEffect(() => {
-    if (!open) { setPosicion(null); return; }
+    if (!open) {
+      setPosicion(null);
+      return;
+    }
     let frame;
     const colocar = () => {
       const boton = triggerRef.current;
@@ -73,10 +82,24 @@ function SelectBuscador({
       const haciaArriba = abajo < 280 && arriba > abajo;
       const maxHeight = Math.min(320, haciaArriba ? arriba : abajo);
       const width = Math.min(rect.width, ancho - 24);
-      const left = Math.max(izquierdaViewport + 12, Math.min(rect.left, izquierdaViewport + ancho - width - 12));
+      const left = Math.max(
+        izquierdaViewport + 12,
+        Math.min(rect.left, izquierdaViewport + ancho - width - 12),
+      );
       const top = haciaArriba ? rect.top - 6 : rect.bottom + 6;
-      const siguiente = { top, left, width, maxHeight, transform: haciaArriba ? 'translateY(-100%)' : 'none' };
-      setPosicion(anterior => anterior && Object.keys(siguiente).every(k => anterior[k] === siguiente[k]) ? anterior : siguiente);
+      const siguiente = {
+        top,
+        left,
+        width,
+        maxHeight,
+        transform: haciaArriba ? "translateY(-100%)" : "none",
+      };
+      setPosicion((anterior) =>
+        anterior &&
+        Object.keys(siguiente).every((k) => anterior[k] === siguiente[k])
+          ? anterior
+          : siguiente,
+      );
       frame = requestAnimationFrame(colocar);
     };
     colocar();
@@ -98,8 +121,16 @@ function SelectBuscador({
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
-  const normalizar = texto => String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const filtrados = options.filter(item => normalizar(item.nombre || item.label || "").includes(normalizar(search.trim())));
+  const normalizar = (texto) =>
+    String(texto)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  const filtrados = options.filter((item) =>
+    normalizar(item.nombre || item.label || "").includes(
+      normalizar(search.trim()),
+    ),
+  );
   const seleccionado = options.find(
     (item) => String(item.id) === String(value),
   );
@@ -171,130 +202,168 @@ function SelectBuscador({
           />
         </svg>
       </button>
-      {open && !disabled && posicion && createPortal(
-        <div ref={panelRef} role="group" aria-label={`Opciones: ${label}`}
-          style={{ ...posicion, position: 'fixed', zIndex: 2000, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-          onKeyDown={e => {
-            if (e.key === 'Tab') {
-              e.preventDefault();
-              e.stopPropagation();
-              const elementos = [...panelRef.current.querySelectorAll('input, button:not(:disabled)')];
-              const index = elementos.indexOf(document.activeElement);
-              const next = index + (e.shiftKey ? -1 : 1);
-              if (next < 0 || next >= elementos.length) { setOpen(false); triggerRef.current?.focus(); }
-              else elementos[next].focus();
-            }
-            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); triggerRef.current?.focus(); }
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault(); e.stopPropagation();
-              const opciones = [...panelRef.current.querySelectorAll('[data-opcion]')];
-              if (!opciones.length) return;
-              const index = opciones.indexOf(document.activeElement);
-              const next = index < 0 ? (e.key === 'ArrowDown' ? 0 : opciones.length - 1) : (index + (e.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length;
-              opciones[next].focus();
-            }
-          }}
-          className="bg-white border border-slate-200 rounded-2xl shadow-xl">
-
-          <div className="shrink-0 p-2.5 border-b border-slate-100 bg-slate-50">
-            <div className="relative flex items-center">
-              <svg
-                className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                ref={inputRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label={searchPlaceholder}
-                placeholder={searchPlaceholder}
-                autoFocus
-                className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
-              />
-              {(search || seleccionado) && (
-                <button
-                  type="button"
-                  onClick={handleLimpiar}
-                  aria-label={search ? "Limpiar búsqueda" : "Limpiar selección"}
-                  className="absolute right-2.5 p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+      {open &&
+        !disabled &&
+        posicion &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="group"
+            aria-label={`Opciones: ${label}`}
+            style={{
+              ...posicion,
+              position: "fixed",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Tab") {
+                e.preventDefault();
+                e.stopPropagation();
+                const elementos = [
+                  ...panelRef.current.querySelectorAll(
+                    "input, button:not(:disabled)",
+                  ),
+                ];
+                const index = elementos.indexOf(document.activeElement);
+                const next = index + (e.shiftKey ? -1 : 1);
+                if (next < 0 || next >= elementos.length) {
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                } else elementos[next].focus();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpen(false);
+                triggerRef.current?.focus();
+              }
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                e.stopPropagation();
+                const opciones = [
+                  ...panelRef.current.querySelectorAll("[data-opcion]"),
+                ];
+                if (!opciones.length) return;
+                const index = opciones.indexOf(document.activeElement);
+                const next =
+                  index < 0
+                    ? e.key === "ArrowDown"
+                      ? 0
+                      : opciones.length - 1
+                    : (index +
+                        (e.key === "ArrowDown" ? 1 : -1) +
+                        opciones.length) %
+                      opciones.length;
+                opciones[next].focus();
+              }
+            }}
+            className="bg-white border border-slate-200 rounded-2xl shadow-xl"
+          >
+            <div className="shrink-0 p-2.5 border-b border-slate-100 bg-slate-50">
+              <div className="relative flex items-center">
+                <svg
+                  className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="min-h-0 overflow-y-auto overscroll-contain divide-y divide-slate-50">
-            {filtrados.length === 0 ? (
-              <div className="px-4 py-4 text-xs text-slate-600 text-center font-medium">
-                No se encontraron resultados
-              </div>
-            ) : (
-              filtrados.map((item) => {
-                const activo = String(item.id) === String(value);
-                return (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  aria-label={searchPlaceholder}
+                  placeholder={searchPlaceholder}
+                  autoFocus
+                  className="w-full bg-white text-slate-900 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:outline-none focus:border-slate-400 font-medium placeholder-slate-500"
+                />
+                {(search || seleccionado) && (
                   <button
                     type="button"
-                    key={item.id}
-                    data-opcion="true"
-                    onClick={() => {
-                      onChange(String(item.id));
-                      setOpen(false);
-                      containerRef.current?.querySelector("button")?.focus();
-                      setSearch("");
-                    }}
-                    className={`w-full text-left px-4 py-3 text-[13px] transition-colors flex items-center justify-between gap-3 ${
-                      activo
-                        ? "bg-slate-900 text-white font-semibold"
-                        : "text-slate-700 font-medium hover:bg-slate-50"
-                    }`}
+                    onClick={handleLimpiar}
+                    aria-label={
+                      search ? "Limpiar búsqueda" : "Limpiar selección"
+                    }
+                    className="absolute right-2.5 p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
                   >
-                    <span className="leading-snug break-words">
-                      {item.nombre || item.label}
-                    </span>
-                    {activo && (
-                      <svg
-                        className="w-4 h-4 flex-shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2.5}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.5}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
                   </button>
-                );
-              })
-            )}
-          </div>
-        </div>, document.body
-      )}
+                )}
+              </div>
+            </div>
+            <div className="min-h-0 overflow-y-auto overscroll-contain divide-y divide-slate-50">
+              {filtrados.length === 0 ? (
+                <div className="px-4 py-4 text-xs text-slate-600 text-center font-medium">
+                  No se encontraron resultados
+                </div>
+              ) : (
+                filtrados.map((item) => {
+                  const activo = String(item.id) === String(value);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      data-opcion="true"
+                      onClick={() => {
+                        onChange(String(item.id));
+                        setOpen(false);
+                        containerRef.current?.querySelector("button")?.focus();
+                        setSearch("");
+                      }}
+                      className={`w-full text-left px-4 py-3 text-[13px] transition-colors flex items-center justify-between gap-3 ${
+                        activo
+                          ? "bg-slate-900 text-white font-semibold"
+                          : "text-slate-700 font-medium hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="leading-snug break-words">
+                        {item.nombre || item.label}
+                      </span>
+                      {activo && (
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2.5}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -307,6 +376,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
   const ocupadoRef = useRef(false);
   const [carreras, setCarreras] = useState([]);
   const [niveles, setNiveles] = useState([]);
+  const [sedes, setSedes] = useState([]);
   const [facultadesRecibidas, setFacultadesRecibidas] = useState([]);
   const facultades = catalogoFacultades.length
     ? catalogoFacultades
@@ -315,6 +385,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
   const [facultadFiltro, setFacultadFiltro] = useState("");
   const [nivelFiltro, setNivelFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [sedeFiltro, setSedeFiltro] = useState("");
   const [orden, setOrden] = useState("asc");
   const [pagina, setPagina] = useState(1);
   const [limite, setLimite] = useState(10);
@@ -330,8 +401,16 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
     nombreCarrera: "",
     idFacultad: "",
     idNivel: "",
+    idsSedes: [],
   });
   const [motivoCambioEstado, setMotivoCambioEstado] = useState("");
+  const alternarSede = (id) =>
+    setFormData((actual) => ({
+      ...actual,
+      idsSedes: actual.idsSedes.includes(Number(id))
+        ? actual.idsSedes.filter((x) => x !== Number(id))
+        : [...actual.idsSedes, Number(id)],
+    }));
   const cargarDatos = useCallback(async () => {
     peticionActiva.current?.abort();
     const control = new AbortController();
@@ -341,10 +420,15 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
     const timer = setTimeout(() => control.abort("timeout"), 20000);
     try {
       const [resCat, resCar] = await Promise.all([
-        solicitar("/api/v1/catalogos?nombres=niveles_academicos", {
+        solicitar(
+          "/api/v1/catalogos?nombres=niveles_academicos,sedes,estados_carrera,facultades",
+          {
+            signal: control.signal,
+          },
+        ),
+        solicitar("/api/v1/carreras/administracion", {
           signal: control.signal,
         }),
-        solicitar("/api/v1/carreras", { signal: control.signal }),
       ]);
       const [dataCat, dataCar] = await Promise.all([
         resCat.json(),
@@ -360,6 +444,14 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
         throw new Error(
           "El servidor devolvió un formato de carreras inválido.",
         );
+      if (
+        !Array.isArray(dataCat.sedes) ||
+        !Array.isArray(dataCat.facultades) ||
+        !Array.isArray(dataCat.estados_carrera)
+      )
+        throw new Error(
+          "No se pudieron cargar los catálogos de sedes, facultades o estados.",
+        );
       if (!Array.isArray(dataCat.niveles_academicos))
         throw new Error("No se pudo cargar el catálogo de niveles académicos.");
       const catalogoNiveles = dataCat.niveles_academicos.map((n) => ({
@@ -368,23 +460,30 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       }));
       if (catalogoNiveles.some((n) => !n.id || typeof n.nombre !== "string"))
         throw new Error("El catálogo de niveles contiene registros inválidos.");
+      const catalogoSedes = dataCat.sedes.map((s) => ({
+        id: Number(s.id),
+        nombre: s.nombre,
+      }));
+      const catalogoFacultades = dataCat.facultades.map((f) => ({
+        id: Number(f.id),
+        nombre: f.nombre,
+      }));
+      if (
+        [...catalogoSedes, ...catalogoFacultades].some(
+          (item) =>
+            !Number.isInteger(item.id) ||
+            item.id <= 0 ||
+            typeof item.nombre !== "string" ||
+            !item.nombre.trim(),
+        )
+      )
+        throw new Error(
+          "Los catálogos de sedes o facultades contienen registros inválidos.",
+        );
       if (montado.current && peticionActiva.current === control) {
         setNiveles(catalogoNiveles);
-        setFacultadesRecibidas([
-          ...new Map(
-            dataCar
-              .filter(
-                (c) =>
-                  c.idFacultad != null &&
-                  typeof c.facultad === "string" &&
-                  c.facultad.trim(),
-              )
-              .map((c) => [
-                String(c.idFacultad),
-                { id: c.idFacultad, nombre: c.facultad },
-              ]),
-          ).values(),
-        ]);
+        setSedes(catalogoSedes);
+        setFacultadesRecibidas(catalogoFacultades);
         setCarreras(dataCar);
       }
     } catch (error) {
@@ -470,6 +569,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       nombreCarrera: "",
       idFacultad: "",
       idNivel: "",
+      idsSedes: [],
     });
     setModalFormulario(true);
   };
@@ -487,6 +587,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       nombreCarrera: carrera.nombreCarrera,
       idFacultad: facId,
       idNivel: carrera.idNivel || "",
+      idsSedes: (carrera.sedes || []).map((s) => Number(s.idSede)),
     });
     setModalFormulario(true);
   };
@@ -543,6 +644,16 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       !niveles.some((n) => String(n.id) === String(formData.idNivel))
     )
       return toast.warning("Selecciona una facultad y un nivel válidos.");
+    if (!formData.idsSedes.length)
+      return toast.warning("Selecciona al menos una sede.");
+    if (
+      formData.idsSedes.some(
+        (id) => !sedes.some((s) => Number(s.id) === Number(id)),
+      )
+    )
+      return toast.warning(
+        "Hay sedes seleccionadas que no existen en el catálogo.",
+      );
     if (modoEdicion && formData.idCarrera == null)
       return toast.error("Identificador de carrera inválido.");
     return ejecutarCambio(
@@ -554,6 +665,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
         nombreCarrera: nombreStr,
         idFacultad: Number(formData.idFacultad),
         idNivel: Number(formData.idNivel),
+        idsSedes: formData.idsSedes,
       },
       modoEdicion ? "Carrera actualizada" : "Carrera registrada",
     );
@@ -567,11 +679,17 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       );
     if (formData.idCarrera == null)
       return toast.error("Identificador de carrera inválido.");
+    const reactivar =
+      getEstado(
+        carreras.find(
+          (c) => String(c.idCarrera) === String(formData.idCarrera),
+        ) || {},
+      ) === "INACTIVA";
     return ejecutarCambio(
-      `/api/v1/carreras/${encodeURIComponent(formData.idCarrera)}/desactivar`,
+      `/api/v1/carreras/${encodeURIComponent(formData.idCarrera)}/${reactivar ? "reactivar" : "desactivar"}`,
       "PATCH",
       { motivo },
-      "Carrera desactivada",
+      reactivar ? "Carrera reactivada" : "Carrera desactivada",
     );
   };
   const getEstado = (c) => {
@@ -579,8 +697,8 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       typeof c.estadoCarrera === "string"
         ? c.estadoCarrera.trim().toUpperCase()
         : "";
-    if (nombre === "ACTIVA" || nombre === "INACTIVA") return nombre;
-    return Number(c.idEstadoCarrera) === 1 ? "ACTIVA" : "NO DISPONIBLE";
+    if (["ACTIVA", "INACTIVA", "PLANIFICACION"].includes(nombre)) return nombre;
+    return "DESCONOCIDO";
   };
   const getFacultadNombre = (c) =>
     typeof c.facultad === "string"
@@ -614,7 +732,12 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       const matchNivel = !nivelFiltro || getNivelNombre(c) === nivelFiltro;
       const matchEstado =
         !estadoFiltro || String(getEstado(c)) === estadoFiltro;
-      return matchBuscador && matchFacultad && matchNivel && matchEstado;
+      const matchSede =
+        !sedeFiltro ||
+        (c.sedes || []).some((s) => String(s.idSede) === String(sedeFiltro));
+      return (
+        matchBuscador && matchFacultad && matchNivel && matchEstado && matchSede
+      );
     })
     .sort((a, b) => {
       const strA = String(a.nombreCarrera);
@@ -625,7 +748,15 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
     });
   useEffect(() => {
     setPagina(1);
-  }, [busqueda, facultadFiltro, nivelFiltro, estadoFiltro, limite, orden]);
+  }, [
+    busqueda,
+    facultadFiltro,
+    nivelFiltro,
+    estadoFiltro,
+    sedeFiltro,
+    limite,
+    orden,
+  ]);
   const totalPaginas = Math.max(1, Math.ceil(listadoFiltrado.length / limite));
   const paginaSegura = Math.min(pagina, totalPaginas);
   const elementosVisibles = listadoFiltrado.slice(
@@ -638,6 +769,12 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
         return (
           <span className="bg-slate-900 text-white border border-slate-900 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-widest">
             ACTIVA
+          </span>
+        );
+      case "PLANIFICACION":
+        return (
+          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-widest">
+            PLANIFICACIÓN
           </span>
         );
       case "INACTIVA":
@@ -661,30 +798,39 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-inter font-extrabold text-slate-900 tracking-tight">
-            Gestión de carreras
+            Gestión académica
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-1">
-            Catálogo institucional de oferta académica.
+            Administración del catálogo institucional de carreras.
           </p>
         </div>
         <button
           onClick={abrirNuevo}
           disabled={
-            cargando || !!errorCarga || !facultades.length || !niveles.length
+            cargando ||
+            !!errorCarga ||
+            !facultades.length ||
+            !niveles.length ||
+            !sedes.length
           }
           className="h-[50px] px-8 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center"
         >
           Nueva carrera
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           {
             id: "",
             titulo: "Total de carreras",
             sub: "Catálogo institucional",
           },
-          { id: "ACTIVA", titulo: "Activas", sub: "Oferta académica vigente" },
+          { id: "ACTIVA", titulo: "Activas", sub: "Carreras activas" },
+          {
+            id: "PLANIFICACION",
+            titulo: "En planificación",
+            sub: "Pendientes de configuración",
+          },
           {
             id: "INACTIVA",
             titulo: "Inactivas",
@@ -736,7 +882,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
               {cargando ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label
                 htmlFor="carrera-buscar"
@@ -775,12 +921,23 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
             </div>
             <div>
               <SelectBuscador
+                label="Sede"
+                value={sedeFiltro}
+                onChange={setSedeFiltro}
+                options={sedes}
+                placeholder="Todas las sedes"
+                searchPlaceholder="Buscar sede..."
+              />
+            </div>
+            <div>
+              <SelectBuscador
                 label="Estado"
                 value={estadoFiltro}
                 onChange={setEstadoFiltro}
                 options={[
                   { id: "ACTIVA", nombre: "Activa" },
                   { id: "INACTIVA", nombre: "Inactiva" },
+                  { id: "PLANIFICACION", nombre: "En planificación" },
                 ]}
                 placeholder="Todos los estados"
                 searchPlaceholder="Buscar estado..."
@@ -794,7 +951,11 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
                 : `${listadoFiltrado.length} de ${carreras.length} carreras`}
             </span>
             <div className="flex items-center gap-4">
-              {(busqueda || facultadFiltro || nivelFiltro || estadoFiltro) && (
+              {(busqueda ||
+                facultadFiltro ||
+                nivelFiltro ||
+                estadoFiltro ||
+                sedeFiltro) && (
                 <button
                   type="button"
                   onClick={() => {
@@ -802,6 +963,7 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
                     setFacultadFiltro("");
                     setNivelFiltro("");
                     setEstadoFiltro("");
+                    setSedeFiltro("");
                   }}
                   className="underline underline-offset-4 text-slate-700"
                 >
@@ -873,13 +1035,18 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
               Ajusta los filtros de búsqueda o registra una nueva carrera para
               comenzar.
             </p>
-            {(busqueda || facultadFiltro || nivelFiltro || estadoFiltro) && (
+            {(busqueda ||
+              facultadFiltro ||
+              nivelFiltro ||
+              estadoFiltro ||
+              sedeFiltro) && (
               <button
                 onClick={() => {
                   setBusqueda("");
                   setFacultadFiltro("");
                   setNivelFiltro("");
                   setEstadoFiltro("");
+                  setSedeFiltro("");
                 }}
                 className="mt-6 px-6 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-colors"
               >
@@ -942,6 +1109,13 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
                       <p className="text-xs font-medium text-slate-500 mt-1">
                         {getFacultadNombre(carrera)}
                       </p>
+                      {Array.isArray(carrera.sedes) &&
+                        carrera.sedes.length > 0 && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Sedes:{" "}
+                            {carrera.sedes.map((s) => s.nombreSede).join(", ")}
+                          </p>
+                        )}
                     </td>
                     <td className="px-6 py-5 align-top pt-6 text-xs font-semibold text-slate-600">
                       {getNivelNombre(carrera)}
@@ -977,6 +1151,13 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
                             className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-500 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
                           >
                             Desactivar
+                          </button>
+                        ) : getEstado(carrera) === "INACTIVA" ? (
+                          <button
+                            onClick={() => abrirModalEstado(carrera)}
+                            className="px-3 py-1.5 rounded-lg border border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                          >
+                            Reactivar
                           </button>
                         ) : null}
                       </div>
@@ -1055,55 +1236,254 @@ export default function GestionCarreras({ catalogoFacultades = [] }) {
           </div>
         )}
       </section>
-      {typeof document !== "undefined" && createPortal(
-        <AnimatePresence>
-          {(modalFormulario || modalEstado) && (
-            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => { if (!procesando) { setModalFormulario(false); setModalEstado(false); } }}
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" />
-              <motion.div ref={dialogoRef} role="dialog" aria-modal="true" aria-labelledby="carrera-dialog-title"
-                tabIndex={-1} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
-                className="relative flex w-full max-w-xl max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                <header className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
-                  <div>
-                    <h2 id="carrera-dialog-title" className="text-xl font-bold tracking-tight text-slate-900">{modalEstado ? 'Desactivar carrera' : modoEdicion ? 'Actualizar carrera' : 'Nueva carrera'}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{modalEstado ? 'Indica el motivo de la baja para dejar constancia.' : 'Completa la información de la oferta académica.'}</p>
-                  </div>
-                  <button type="button" disabled={procesando} aria-label="Cerrar ventana" onClick={() => { setModalFormulario(false); setModalEstado(false); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-40">×</button>
-                </header>
-                <form onSubmit={modalEstado ? confirmarCambioEstado : guardarRegistro} className="flex min-h-0 flex-1 flex-col">
-                  <div className="min-h-0 overflow-y-auto px-5 py-6 sm:px-6 space-y-5">
-                    {modalEstado ? <>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-500">Carrera seleccionada</p><p className="mt-1 text-sm font-semibold leading-relaxed text-slate-900 break-words">{formData.nombreCarrera}</p></div>
-                      <div>
-                        <label htmlFor="carrera-motivo" className="mb-2 block text-sm font-semibold text-slate-700">Justificación de cierre <span aria-hidden="true">*</span></label>
-                        <textarea id="carrera-motivo" required minLength={10} maxLength={250} disabled={procesando} value={motivoCambioEstado} onChange={e => setMotivoCambioEstado(e.target.value)} aria-describedby="carrera-motivo-ayuda" placeholder="Describe la resolución o el motivo de la baja…" className="w-full min-h-28 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50" />
-                        <div id="carrera-motivo-ayuda" className="mt-2 flex justify-between gap-3 text-xs text-slate-500"><span>Mínimo 10 caracteres.</span><span>{motivoCambioEstado.trim().length} / 250</span></div>
-                      </div>
-                    </> : <>
-                      <div>
-                        <label htmlFor="carrera-nombre" className="mb-2 block text-sm font-semibold text-slate-700">Nombre oficial <span aria-hidden="true">*</span></label>
-                        <input id="carrera-nombre" required minLength={3} maxLength={150} disabled={procesando} value={formData.nombreCarrera} onChange={e => setFormData({ ...formData, nombreCarrera: e.target.value })} placeholder="Ej. Licenciatura en Informática" className={inputClasses} />
-                      </div>
-                      <div>
-                        <SelectBuscador label="Facultad *" disabled={procesando} value={formData.idFacultad} onChange={value => setFormData({ ...formData, idFacultad: value })} options={facultades} placeholder="Selecciona una facultad" searchPlaceholder="Buscar facultad…" />
-                      </div>
-                      <div>
-                        <SelectBuscador label="Nivel académico *" disabled={procesando} value={formData.idNivel} onChange={value => setFormData({ ...formData, idNivel: value })} options={niveles} placeholder="Selecciona un nivel" searchPlaceholder="Buscar nivel…" />
-                      </div>
-                    </>}
-                  </div>
-                  <footer className="shrink-0 flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-                    <button type="button" disabled={procesando} onClick={() => { setModalFormulario(false); setModalEstado(false); }} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">Cancelar</button>
-                    <button type="submit" disabled={procesando} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">{procesando ? 'Procesando…' : modalEstado ? 'Desactivar carrera' : 'Guardar carrera'}</button>
-                  </footer>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>, document.body
-      )}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {(modalFormulario || modalEstado) && (
+              <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => {
+                    if (!procesando) {
+                      setModalFormulario(false);
+                      setModalEstado(false);
+                    }
+                  }}
+                  className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+                />
+                <motion.div
+                  ref={dialogoRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="carrera-dialog-title"
+                  tabIndex={-1}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  className="relative flex w-full max-w-xl max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                >
+                  <header className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
+                    <div>
+                      <h2
+                        id="carrera-dialog-title"
+                        className="text-xl font-bold tracking-tight text-slate-900"
+                      >
+                        {modalEstado
+                          ? getEstado(
+                              carreras.find(
+                                (c) =>
+                                  String(c.idCarrera) ===
+                                  String(formData.idCarrera),
+                              ) || {},
+                            ) === "INACTIVA"
+                            ? "Reactivar carrera"
+                            : "Desactivar carrera"
+                          : modoEdicion
+                            ? "Actualizar carrera"
+                            : "Nueva carrera"}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {modalEstado
+                          ? "Indica la justificación del cambio de estado para dejar constancia."
+                          : "Completa la información de la oferta académica."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={procesando}
+                      aria-label="Cerrar ventana"
+                      onClick={() => {
+                        setModalFormulario(false);
+                        setModalEstado(false);
+                      }}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                    >
+                      ×
+                    </button>
+                  </header>
+                  <form
+                    onSubmit={
+                      modalEstado ? confirmarCambioEstado : guardarRegistro
+                    }
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <div className="min-h-0 overflow-y-auto px-5 py-6 sm:px-6 space-y-5">
+                      {modalEstado ? (
+                        <>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold text-slate-500">
+                              Carrera seleccionada
+                            </p>
+                            <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-900 break-words">
+                              {formData.nombreCarrera}
+                            </p>
+                          </div>
+                          <div>
+                            <label
+                              htmlFor="carrera-motivo"
+                              className="mb-2 block text-sm font-semibold text-slate-700"
+                            >
+                              Justificación del cambio{" "}
+                              <span aria-hidden="true">*</span>
+                            </label>
+                            <textarea
+                              id="carrera-motivo"
+                              required
+                              minLength={10}
+                              maxLength={250}
+                              disabled={procesando}
+                              value={motivoCambioEstado}
+                              onChange={(e) =>
+                                setMotivoCambioEstado(e.target.value)
+                              }
+                              aria-describedby="carrera-motivo-ayuda"
+                              placeholder="Describe el motivo del cambio de estado…"
+                              className="w-full min-h-28 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                            />
+                            <div
+                              id="carrera-motivo-ayuda"
+                              className="mt-2 flex justify-between gap-3 text-xs text-slate-500"
+                            >
+                              <span>Mínimo 10 caracteres.</span>
+                              <span>
+                                {motivoCambioEstado.trim().length} / 250
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <label
+                              htmlFor="carrera-nombre"
+                              className="mb-2 block text-sm font-semibold text-slate-700"
+                            >
+                              Nombre oficial <span aria-hidden="true">*</span>
+                            </label>
+                            <input
+                              id="carrera-nombre"
+                              required
+                              minLength={3}
+                              maxLength={150}
+                              disabled={procesando}
+                              value={formData.nombreCarrera}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  nombreCarrera: e.target.value,
+                                })
+                              }
+                              placeholder="Ej. Licenciatura en Informática"
+                              className={inputClasses}
+                            />
+                          </div>
+                          <div>
+                            <SelectBuscador
+                              label="Facultad *"
+                              disabled={procesando}
+                              value={formData.idFacultad}
+                              onChange={(value) =>
+                                setFormData({ ...formData, idFacultad: value })
+                              }
+                              options={facultades}
+                              placeholder="Selecciona una facultad"
+                              searchPlaceholder="Buscar facultad…"
+                            />
+                          </div>
+                          <div>
+                            <SelectBuscador
+                              label="Nivel académico *"
+                              disabled={procesando}
+                              value={formData.idNivel}
+                              onChange={(value) =>
+                                setFormData({ ...formData, idNivel: value })
+                              }
+                              options={niveles}
+                              placeholder="Selecciona un nivel"
+                              searchPlaceholder="Buscar nivel…"
+                            />
+                          </div>
+                          <fieldset
+                            className="rounded-xl border border-slate-200 p-4"
+                            disabled={procesando}
+                          >
+                            <legend className="px-1 text-sm font-semibold text-slate-700">
+                              Sedes asignadas *
+                            </legend>
+                            <p className="mb-3 text-xs text-slate-500">
+                              Selecciona al menos una sede. Las sedes con
+                              historial académico pueden estar protegidas contra
+                              su retiro.
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {sedes.map((sede) => (
+                                <label
+                                  key={sede.id}
+                                  className="flex items-start gap-2 rounded-lg border border-slate-100 p-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="mt-1 accent-slate-900"
+                                    checked={formData.idsSedes.includes(
+                                      Number(sede.id),
+                                    )}
+                                    onChange={() => alternarSede(sede.id)}
+                                    disabled={procesando}
+                                  />
+                                  <span>{sede.nombre}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {!sedes.length && (
+                              <p className="text-sm text-rose-700">
+                                No hay sedes disponibles en el catálogo.
+                              </p>
+                            )}
+                          </fieldset>
+                        </>
+                      )}
+                    </div>
+                    <footer className="shrink-0 flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+                      <button
+                        type="button"
+                        disabled={procesando}
+                        onClick={() => {
+                          setModalFormulario(false);
+                          setModalEstado(false);
+                        }}
+                        className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={procesando}
+                        className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {procesando
+                          ? "Procesando…"
+                          : modalEstado
+                            ? getEstado(
+                                carreras.find(
+                                  (c) =>
+                                    String(c.idCarrera) ===
+                                    String(formData.idCarrera),
+                                ) || {},
+                              ) === "INACTIVA"
+                              ? "Reactivar carrera"
+                              : "Desactivar carrera"
+                            : "Guardar carrera"}
+                      </button>
+                    </footer>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }
