@@ -1,12 +1,20 @@
 // --- util/admisionValidaciones.js ---
 
-export const esId = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0;
+export const esId = (value) =>
+  Number.isSafeInteger(Number(value)) && Number(value) > 0;
 
 export const normalizarTexto = (value) =>
-  String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
-export const extraerDigitos = (texto = "") => String(texto || "").replace(/\D/g, "");
-export const extraerAlfanumerico = (texto = "") => String(texto || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+export const extraerDigitos = (texto = "") =>
+  String(texto || "").replace(/\D/g, "");
+export const extraerAlfanumerico = (texto = "") =>
+  String(texto || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 
 // Cálculo real matemático Módulo 10 para DUI
 export const validarDUI = (dui) => {
@@ -25,30 +33,49 @@ export const validarNIT = (nit) => {
 };
 
 // Auto-formato en tiempo real
+
 export const formatoDocumento = (tipo, valor) => {
   const tipoStr = String(tipo);
-  if (tipoStr === "1") { // DUI
+
+  if (tipoStr === "1") {
+    // DUI
     const n = extraerDigitos(valor).slice(0, 9);
     return n.length <= 8 ? n : `${n.slice(0, 8)}-${n.slice(8)}`;
   }
-  if (tipoStr === "3") { // NIT
+
+  if (tipoStr === "3") {
+    // NIT
     const n = extraerDigitos(valor).slice(0, 14);
     if (n.length <= 4) return n;
     if (n.length <= 10) return `${n.slice(0, 4)}-${n.slice(4)}`;
-    if (n.length <= 13) return `${n.slice(0, 4)}-${n.slice(4, 10)}-${n.slice(10)}`;
+    if (n.length <= 13)
+      return `${n.slice(0, 4)}-${n.slice(4, 10)}-${n.slice(10)}`;
     return `${n.slice(0, 4)}-${n.slice(4, 10)}-${n.slice(10, 13)}-${n.slice(13)}`;
   }
-  // Pasaporte u otros (solo letras y números)
+
+  if (tipoStr === "2") {
+    // PASAPORTE
+    const limpio = extraerAlfanumerico(valor).toUpperCase();
+    const letra = limpio.charAt(0);
+
+    if (!/^[A-Z]$/.test(letra)) return "";
+
+    const numeros = limpio.slice(1).replace(/\D/g, "").slice(0, 8);
+    return letra + numeros;
+  }
+
   return extraerAlfanumerico(valor).slice(0, 15);
 };
 
 export const errorDocumento = (tipo, numero) => {
   if (!esId(tipo)) return "Selecciona un tipo de documento.";
   const tipoStr = String(tipo);
-  
-  if (tipoStr === "1") return validarDUI(numero) ? "" : "DUI inválido: No supera la validación.";
-  if (tipoStr === "3") return validarNIT(numero) ? "" : "NIT inválido: Formato incorrecto.";
-  
+
+  if (tipoStr === "1")
+    return validarDUI(numero) ? "" : "DUI inválido: No supera la validación.";
+  if (tipoStr === "3")
+    return validarNIT(numero) ? "" : "NIT inválido: Formato incorrecto.";
+
   return /^[0-9A-Z]{5,15}$/.test(numero)
     ? ""
     : "El pasaporte debe tener entre 5 y 15 caracteres alfanuméricos.";
@@ -68,37 +95,45 @@ export const calcularFechaMaxima = (edadMinima) => {
 
 export function validarDatosPersonales(data, distritos, maxFechaStr) {
   const errors = {};
-  
-  const documentError = errorDocumento(data.idTipoDocumento, data.numeroDocumento);
+
+  const documentError = errorDocumento(
+    data.idTipoDocumento,
+    data.numeroDocumento,
+  );
   if (documentError) errors.numeroDocumento = documentError;
-  
+
   for (const field of ["nombres", "apellidos"]) {
     const text = data[field]?.trim() || "";
     if (!text || text.length > 100 || !/^[A-ZÁÉÍÓÚÑ ]+$/.test(text))
       errors[field] = "Solo se permiten letras mayúsculas.";
   }
-  
+
   const date = data.fechaNacimiento;
   if (!date || date > maxFechaStr) {
     errors.fechaNacimiento = "Fecha inválida o no cumples con la edad mínima.";
   }
-  
+
   if (!["M", "F"].includes(data.sexo)) errors.sexo = "Selecciona una opción.";
-  
+
   const mail = data.correoPersonal?.trim() || "";
   if (mail.length > 150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail))
     errors.correoPersonal = "Introduce un correo válido.";
-    
+
   if (!/^[267]\d{3}-\d{4}$/.test(data.telefono))
     errors.telefono = "Debe iniciar con 2, 6 o 7 (Ej. 7000-0000).";
-    
+
   if (!esId(data.idDepartamento)) errors.idDepartamento = "Requerido.";
-  if (!esId(data.idDistrito) || !distritos.some((d) => String(d.id ?? d.idDistrito) === String(data.idDistrito)))
+  if (
+    !esId(data.idDistrito) ||
+    !distritos.some(
+      (d) => String(d.id ?? d.idDistrito) === String(data.idDistrito),
+    )
+  )
     errors.idDistrito = "Selecciona un distrito válido.";
-    
+
   if (!data.direccion?.trim() || data.direccion.trim().length > 255)
     errors.direccion = "Introduce una dirección de hasta 255 caracteres.";
-    
+
   return errors;
 }
 
@@ -117,7 +152,10 @@ export function validarSeleccion(oferta, seleccion) {
   const materias = new Set();
   return seleccion.every((id) => {
     const materia = oferta.find((m) =>
-      m.gruposDisponibles?.some((g) => String(g.idGrupo) === String(id) && Number(g.cuposDisponibles) > 0),
+      m.gruposDisponibles?.some(
+        (g) =>
+          String(g.idGrupo) === String(id) && Number(g.cuposDisponibles) > 0,
+      ),
     );
     if (!materia || materias.has(String(materia.idMateria))) return false;
     materias.add(String(materia.idMateria));
@@ -127,14 +165,25 @@ export function validarSeleccion(oferta, seleccion) {
 
 export function validarTarjeta(card, now = new Date()) {
   const errors = {};
-  if (!/^\d{13,19}$/.test(card.numero.replace(/\s/g, ""))) errors.numero = "Introduce entre 13 y 19 dígitos.";
-  if (!card.titular.trim() || card.titular.trim().length > 150) errors.titular = "Requerido (máximo 150 caracteres).";
+  if (!/^\d{13,19}$/.test(card.numero.replace(/\s/g, "")))
+    errors.numero = "Introduce entre 13 y 19 dígitos.";
+  if (!card.titular.trim() || card.titular.trim().length > 150)
+    errors.titular = "Requerido (máximo 150 caracteres).";
   const match = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(card.expiracion);
-  if (!match || 2000 + Number(match[2]) < now.getFullYear() || (2000 + Number(match[2]) === now.getFullYear() && Number(match[1]) < now.getMonth() + 1))
+  if (
+    !match ||
+    2000 + Number(match[2]) < now.getFullYear() ||
+    (2000 + Number(match[2]) === now.getFullYear() &&
+      Number(match[1]) < now.getMonth() + 1)
+  )
     errors.expiracion = "Expiración MM/AA no válida o vencida.";
   if (!/^\d{3,4}$/.test(card.cvv)) errors.cvv = "Introduce 3 o 4 dígitos.";
   return errors;
 }
 
 export const errorIncierto = (error) =>
-  error?.kind !== "configuration" && (!error?.status || error.status >= 500 || [408, 409].includes(error.status) || error.kind === "invalid-response");
+  error?.kind !== "configuration" &&
+  (!error?.status ||
+    error.status >= 500 ||
+    [408, 409].includes(error.status) ||
+    error.kind === "invalid-response");
