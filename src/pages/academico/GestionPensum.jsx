@@ -352,6 +352,12 @@ export default function GestionPensum() {
   const [pensum, setPensum] = useState([]);
   const [mostrarNuevoPensum, setMostrarNuevoPensum] = useState(false);
   const [idEditar, setIdEditar] = useState(null);
+  const [origenNuevaVersion, setOrigenNuevaVersion] = useState(null);
+  const [anioNuevaVersion, setAnioNuevaVersion] = useState(
+    new Date().getFullYear() + 1,
+  );
+  const [creandoVersion, setCreandoVersion] = useState(false);
+  const [errorNuevaVersion, setErrorNuevaVersion] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -365,6 +371,70 @@ export default function GestionPensum() {
   const solicitudDetalle = useRef(0);
   const [pensumActivar, setPensumActivar] = useState(null);
   const [activandoPensum, setActivandoPensum] = useState(false);
+  const [pensumEliminar, setPensumEliminar] = useState(null);
+  const [eliminandoPensum, setEliminandoPensum] = useState(false);
+
+  const confirmarNuevaVersion = async () => {
+    if (!origenNuevaVersion || creandoVersion) return;
+    const inicio = Number(anioNuevaVersion);
+    const duracion =
+      origenNuevaVersion.anioFin == null
+        ? null
+        : Number(origenNuevaVersion.anioFin) -
+          Number(origenNuevaVersion.anioInicio) +
+          1;
+    if (
+      !Number.isInteger(inicio) ||
+      inicio <= new Date().getFullYear() ||
+      !duracion ||
+      duracion < 1
+    ) {
+      setErrorNuevaVersion(
+        "Indica un año futuro. El pensum original debe tener una duración definida.",
+      );
+      return;
+    }
+    setCreandoVersion(true);
+    setErrorNuevaVersion("");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Tu sesión ha expirado.");
+      const respuesta = await fetch(
+        `${API_URL}/api/v1/pensum/${encodeURIComponent(origenNuevaVersion.idPensum)}/crear-version`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            idCarrera: origenNuevaVersion.idCarrera,
+            version: inicio,
+            anioInicio: inicio,
+            anioFin: inicio + duracion - 1,
+          }),
+        },
+      );
+      const datos = await respuesta.json().catch(() => null);
+      if (!respuesta.ok)
+        throw new Error(
+          datos?.mensaje ||
+            datos?.message ||
+            `No se pudo crear la versión (${respuesta.status}).`,
+        );
+      if (!datos?.idPensum)
+        throw new Error("El servidor no devolvió el ID de la nueva versión.");
+      setOrigenNuevaVersion(null);
+      setIdEditar(datos.idPensum);
+      setMostrarNuevoPensum(true);
+      toast.success("Nueva versión creada. Puedes comenzar a editarla.");
+    } catch (e) {
+      setErrorNuevaVersion(e.message);
+    } finally {
+      setCreandoVersion(false);
+    }
+  };
 
   const confirmarActivacion = async () => {
     if (!pensumActivar || activandoPensum) return;
@@ -393,7 +463,8 @@ export default function GestionPensum() {
         );
       }
       toast.success("Pensum activado correctamente", {
-        description: "El pensum pasó a VIGENTE y la carrera a ACTIVA.",
+        description:
+          "La nueva versión está VIGENTE. Si existía un pensum vigente anterior, pasó a CERRADO.",
       });
       setPensumActivar(null);
       await cargarListado();
@@ -401,6 +472,49 @@ export default function GestionPensum() {
       toast.error("No se pudo activar el pensum", { description: e.message });
     } finally {
       setActivandoPensum(false);
+    }
+  };
+
+  const eliminarPensum = async () => {
+    if (!pensumEliminar || eliminandoPensum) return;
+
+    setEliminandoPensum(true);
+
+    try {
+      if (!API_URL) throw new Error("VITE_API_URL no está configurada.");
+
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Tu sesión ha expirado.");
+
+      const respuesta = await fetch(
+        `${API_URL}/api/v1/pensum/${encodeURIComponent(pensumEliminar.idPensum)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        },
+      );
+
+      if (!respuesta.ok) {
+        const datos = await respuesta.json().catch(() => null);
+        throw new Error(
+          datos?.mensaje ||
+            datos?.message ||
+            `No se pudo eliminar el pensum (${respuesta.status}).`,
+        );
+      }
+
+      toast.success("Pensum eliminado correctamente");
+      setPensumEliminar(null);
+      await cargarListado();
+    } catch (error) {
+      toast.error("No se pudo eliminar el pensum", {
+        description: error.message,
+      });
+    } finally {
+      setEliminandoPensum(false);
     }
   };
 
@@ -849,6 +963,23 @@ export default function GestionPensum() {
                                       {version.anioFin ?? "Sin año de cierre"}
                                     </div>
                                   </div>
+                                  {["VIGENTE", "CERRADO"].includes(
+                                    version.estadoPensum,
+                                  ) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOrigenNuevaVersion(version);
+                                        setAnioNuevaVersion(
+                                          new Date().getFullYear() + 1,
+                                        );
+                                        setErrorNuevaVersion("");
+                                      }}
+                                      className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                                    >
+                                      Crear nueva versión
+                                    </button>
+                                  )}
                                   {[
                                     "PLANIFICANDO",
                                     "PENDIENTE_APROBACION",
@@ -886,6 +1017,15 @@ export default function GestionPensum() {
                                     <Icono nombre="archivo" size={16} /> Ver
                                     pensum
                                   </button>
+                                  {version.estadoPensum === "PLANIFICANDO" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPensumEliminar(version)}
+                                      className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1018,6 +1158,81 @@ export default function GestionPensum() {
         )}
       </div>
       <AnimatePresence>
+        {origenNuevaVersion && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="titulo-nueva-version"
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+            >
+              <h2
+                id="titulo-nueva-version"
+                className="text-xl font-extrabold text-slate-900"
+              >
+                Crear nueva versión
+              </h2>
+              <p className="mt-3 text-sm text-slate-600">
+                Se copiarán las materias, los ciclos y la obligatoriedad de la
+                versión <strong>{origenNuevaVersion.version}</strong> de{" "}
+                <strong>{origenNuevaVersion.nombreCarrera}</strong>. El pensum
+                original no se modificará y la nueva versión iniciará en{" "}
+                <strong>PLANIFICANDO</strong>.
+              </p>
+              <label className="mt-5 block text-sm font-semibold text-slate-800">
+                Año de inicio / nueva versión
+                <input
+                  type="number"
+                  min={new Date().getFullYear() + 1}
+                  value={anioNuevaVersion}
+                  onChange={(e) => setAnioNuevaVersion(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-600"
+                />
+              </label>
+              <p className="mt-2 text-xs text-slate-500">
+                Año final estimado:{" "}
+                {origenNuevaVersion.anioFin == null
+                  ? "Duración no definida"
+                  : Number(anioNuevaVersion) +
+                    Number(origenNuevaVersion.anioFin) -
+                    Number(origenNuevaVersion.anioInicio)}
+              </p>
+              {errorNuevaVersion && (
+                <p role="alert" className="mt-3 text-sm text-red-700">
+                  {errorNuevaVersion}
+                </p>
+              )}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={creandoVersion}
+                  onClick={() => setOrigenNuevaVersion(null)}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={creandoVersion}
+                  onClick={confirmarNuevaVersion}
+                  className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {creandoVersion ? "Creando..." : "Crear y editar"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {pensumActivar && (
           <motion.div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"
@@ -1050,16 +1265,25 @@ export default function GestionPensum() {
               </p>
               <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
                 <p>
-                  • El pensum cambiará de <strong>PENDIENTE_APROBACION</strong>{" "}
-                  a <strong>VIGENTE</strong>.
+                  • El pensum versión <strong>{pensumActivar.version}</strong>{" "}
+                  cambiará de <strong>PENDIENTE_APROBACION</strong> a{" "}
+                  <strong>VIGENTE</strong>.
                 </p>
+
                 <p>
-                  • La carrera cambiará de <strong>PLANIFICACION</strong> a{" "}
-                  <strong>ACTIVA</strong>.
+                  • Si existe un pensum vigente anterior de esta carrera, pasará
+                  automáticamente a <strong>CERRADO</strong>.
                 </p>
+
                 <p>
-                  • El plan quedará disponible para los procesos académicos
-                  correspondientes.
+                  • Si la carrera ya está <strong>ACTIVA</strong>, conservará su
+                  estado actual. Si está en <strong>PLANIFICACION</strong>,
+                  pasará a <strong>ACTIVA</strong>.
+                </p>
+
+                <p>
+                  • El nuevo plan de estudios quedará disponible para los
+                  procesos académicos correspondientes.
                 </p>
               </div>
               <p className="mt-3 text-xs text-amber-700">
@@ -1082,6 +1306,81 @@ export default function GestionPensum() {
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {activandoPensum ? "Activando..." : "Confirmar activación"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {pensumEliminar && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !eliminandoPensum)
+                setPensumEliminar(null);
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="titulo-eliminar-pensum"
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+            >
+              <h2
+                id="titulo-eliminar-pensum"
+                className="text-xl font-extrabold text-slate-900"
+              >
+                ¿Eliminar este pensum?
+              </h2>
+
+              <p className="mt-3 text-sm text-slate-600">
+                Se eliminará la versión{" "}
+                <strong>{pensumEliminar.version}</strong> de{" "}
+                <strong>{pensumEliminar.nombreCarrera}</strong>.
+              </p>
+
+              <div className="mt-4 space-y-2 rounded-xl bg-red-50 p-4 text-sm text-red-800">
+                <p>
+                  • El pensum en estado <strong>PLANIFICANDO</strong> será
+                  eliminado.
+                </p>
+                <p>
+                  • Se eliminarán las asignaciones de materias correspondientes.
+                </p>
+                <p>
+                  • La carrera y las materias del catálogo no se modificarán.
+                </p>
+              </div>
+
+              <p className="mt-3 text-xs font-semibold text-red-700">
+                Esta acción es permanente y no se puede deshacer.
+              </p>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={eliminandoPensum}
+                  onClick={() => setPensumEliminar(null)}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={eliminandoPensum}
+                  onClick={eliminarPensum}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {eliminandoPensum ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
             </motion.div>

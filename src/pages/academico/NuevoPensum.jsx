@@ -818,19 +818,20 @@ export default function NuevoPensum({
                               : "Prerrequisitos por consultar"}
                           </p>
                         </div>
+
                         <button
                           type="button"
+                          title="Agregar materia"
+                          aria-label={`Agregar ${m.nombreMateria}`}
                           disabled={
                             asignadas.has(String(m.idMateria)) ||
                             cantidadCiclo(cicloAgregar) >= 5 ||
                             !prerrequisitosListos
                           }
                           onClick={() => agregar(m.idMateria)}
-                          className={`${boton} shrink-0 border border-black bg-white text-black hover:bg-slate-100`}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-green-200 bg-green-50 text-lg font-semibold text-green-700 transition hover:border-green-400 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-30"
                         >
-                          {asignadas.has(String(m.idMateria))
-                            ? "Agregada"
-                            : "+ Agregar"}
+                          +
                         </button>
                       </div>
                     ))}
@@ -904,29 +905,16 @@ export default function NuevoPensum({
                                   UV · Ver prerrequisitos
                                 </span>
                               </button>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <select
-                                  aria-label={`Mover ${m?.nombreMateria || a.idMateria} a otro ciclo`}
-                                  className={`${campo} w-auto`}
-                                  value={a.cicloRecomendado}
-                                  onChange={(e) =>
-                                    actualizar(a.idMateria, {
-                                      cicloRecomendado: Number(e.target.value),
-                                    })
-                                  }
-                                >
-                                  {ciclos.map((n) => (
-                                    <option key={n} value={n}>
-                                      Ciclo {n}
-                                    </option>
-                                  ))}
-                                </select>
+
+                              <div className="flex items-center justify-between gap-3">
                                 <button
                                   type="button"
-                                  className={`${boton} border border-black bg-white text-black hover:bg-slate-100`}
+                                  title="Quitar materia"
+                                  aria-label={`Quitar ${m?.nombreMateria || a.idMateria}`}
                                   onClick={() => quitar(a.idMateria)}
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-lg font-semibold text-red-600 transition hover:border-red-400 hover:bg-red-100"
                                 >
-                                  Quitar
+                                  ×
                                 </button>
                               </div>
                             </div>
