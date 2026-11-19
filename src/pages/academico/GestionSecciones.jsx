@@ -130,6 +130,7 @@ const GestionSecciones = ({ idCicloProp }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const exportandoPdf = useRef(false);
   const cacheCatalogosSede = useRef({ docentes: {}, aulas: {} });
   const [modalEditar, setModalEditar] = useState({ open: false, seccion: null });
   const [docentesSede, setDocentesSede] = useState([]);
@@ -337,55 +338,22 @@ const GestionSecciones = ({ idCicloProp }) => {
     }
   };
 
-  const exportarOfertaPdfActual = () => {
-    if (seccionesFiltradas.length === 0) {
+  const exportarOfertaPdfActual = async () => {
+    if (!seccionesFiltradas.length) {
       toast.warning('No hay secciones en pantalla para exportar.');
       return;
     }
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Habilita las ventanas emergentes para exportar el informe PDF.');
-      return;
+    if (exportandoPdf.current) return;
+    exportandoPdf.current = true;
+    try {
+      const { crearInformeOfertaPdf } = await import('../../utils/informeOfertaPdf');
+      const pdf = crearInformeOfertaPdf(seccionesFiltradas, cicloMeta);
+      pdf.save(`Informe de Oferta Académica - Ciclo ${cicloMeta.codigoCiclo}.pdf`);
+    } catch {
+      toast.error('No se pudo generar el informe de oferta académica.');
+    } finally {
+      exportandoPdf.current = false;
     }
-    printWindow.opener = null;
-    const doc = printWindow.document;
-    doc.title = `Oferta académica - Ciclo ${cicloMeta.codigoCiclo}`;
-    const estilo = doc.createElement('style');
-    estilo.textContent = `@page { size: landscape; margin: 14mm; }
-      body { font: 10pt system-ui, sans-serif; color: #0f172a; padding: 16px; }
-      h1 { font-size: 18pt; } table { width: 100%; border-collapse: collapse; }
-      th { background: #0f172a; color: white; text-align: left; }
-      th, td { padding: 8px; border-bottom: 1px solid #cbd5e1; white-space: pre-line; vertical-align: top; }
-      button { background: #0f172a; color: white; padding: 12px 18px; border: 0; border-radius: 8px; cursor: pointer; }
-      @media print { button { display: none; } tr { break-inside: avoid; } }`;
-    doc.head.appendChild(estilo);
-    const agregar = (padre, etiqueta, texto) => {
-      const elemento = doc.createElement(etiqueta);
-      elemento.textContent = String(texto ?? '—');
-      padre.appendChild(elemento);
-      return elemento;
-    };
-    agregar(doc.body, 'button', 'Imprimir informe PDF').addEventListener('click', () => printWindow.print());
-    agregar(doc.body, 'h1', 'Universidad Modular Abierta');
-    agregar(doc.body, 'p', `Matriz de secciones · Ciclo ${cicloMeta.codigoCiclo} (${cicloMeta.estadoCiclo}) · ${seccionesFiltradas.length} secciones`);
-    const tabla = doc.createElement('table');
-    doc.body.appendChild(tabla);
-    const cabecera = doc.createElement('thead');
-    tabla.appendChild(cabecera);
-    const filaCabecera = doc.createElement('tr');
-    cabecera.appendChild(filaCabecera);
-    ['#', 'Código', 'Carrera', 'Asignatura', 'Docente', 'Sede', 'Modalidad / Aula', 'Horarios', 'Cupos', 'Estado'].forEach(texto => agregar(filaCabecera, 'th', texto));
-    const cuerpo = doc.createElement('tbody');
-    tabla.appendChild(cuerpo);
-    seccionesFiltradas.forEach((seccion, indice) => {
-      const fila = doc.createElement('tr');
-      cuerpo.appendChild(fila);
-      const horarios = Array.isArray(seccion.horarios) ? seccion.horarios.map(h => `${h.dia}: ${String(h.horaInicio ?? '').slice(0, 5)} - ${String(h.horaFin ?? '').slice(0, 5)}`).join('\n') : '';
-      [indice + 1, seccion.codigoGrupo, seccion.nombreCarrera || seccion.carrera || 'Carrera general',
-        `${seccion.nombreMateria ?? ''}\n${seccion.codigoMateria ?? ''}`, seccion.nombreDocente, seccion.nombreSede,
-        `${seccion.modalidad ?? ''}\n${seccion.aulaOEnlace || 'N/A'}`, horarios || 'Sin horarios', seccion.cupoMaximo,
-        seccion.estadoGrupo].forEach(valor => agregar(fila, 'td', valor));
-    });
   };
 
   const opcionesFiltroCarreras = Object.entries(kpis.mapaCarreras).map(([nombre, cant]) => ({
