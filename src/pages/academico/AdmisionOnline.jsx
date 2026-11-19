@@ -1274,7 +1274,7 @@ export default function AdmisionOnline() {
       setCardData(tarjetaVacia);
       pagoIntento.current = null;
       setPagoIncierto(false);
-      toast.success("Matrícula confirmada por el servidor.");
+      toast.success("Matrícula confirmada exitosamente.");
     } catch (e) {
       if (mounted.current) {
         const uncertain = errorIncierto(e);
@@ -1584,6 +1584,13 @@ export default function AdmisionOnline() {
                         <input
                           id="admision-numeroDocumento"
                           type="text"
+                          maxLength={
+                            String(personalData.idTipoDocumento) === "1"
+                              ? 10
+                              : String(personalData.idTipoDocumento) === "3"
+                                ? 17
+                                : 9
+                          }
                           aria-invalid={!!erroresPaso1.numeroDocumento}
                           disabled={
                             !personalData.idTipoDocumento ||
@@ -1606,7 +1613,7 @@ export default function AdmisionOnline() {
                               ? "00000000-0"
                               : String(personalData.idTipoDocumento) === "3"
                                 ? "0000-000000-000-0"
-                                : "Ej. A123456789"
+                                : "A12345678"
                           }
                         />
                         <ErrorCampo mensaje={erroresPaso1.numeroDocumento} />
@@ -2416,7 +2423,7 @@ export default function AdmisionOnline() {
                                 ...prev,
                                 numero: e.target.value
                                   .replace(/\D/g, "")
-                                  .slice(0, 19)
+                                  .slice(0, 16)
                                   .replace(/(.{4})/g, "$1 ")
                                   .trim(),
                               }))
