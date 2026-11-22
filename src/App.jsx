@@ -30,6 +30,9 @@ import Facturas from './pages/finanzas/Facturas';
 import GestionCarreras from './pages/academico/GestionCarreras';
 import GestionPensum from './pages/academico/GestionPensum';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
+import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
+import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
+
 
 const VISTAS = {
   'inicio': Inicio,
@@ -50,7 +53,9 @@ const VISTAS = {
   'asistencias': Asistencias,
   'pagos': VentanillaPagos,
   'aranceles': CatalogoAranceles,
-  'facturas': Facturas
+  'facturas': Facturas,
+  'directorio-estudiantes': DirectorioEstudiantes,
+  'directorio-estudiantes/:idEstudiante': InformacionEstudiante
 };
 
 function RutaProtegida({ children }) {

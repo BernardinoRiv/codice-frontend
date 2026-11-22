@@ -189,6 +189,27 @@ export const menuMaestro = [
     ),
   },
   {
+    name: 'Directorio de estudiantes',
+    path: '/dashboard/directorio-estudiantes',
+    rolesPermitidos: ['ADMINISTRADOR'],
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+        className="w-5 h-5"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 14.25a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM3.75 20.25a8.25 8.25 0 0 1 16.5 0M16.5 7.5h4.5m-2.25-2.25v4.5"
+        />
+      </svg>
+    )
+  },
+  {
     name: 'Oferta académica',
     path: '/dashboard/oferta-academica',
     rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO', 'ADMINISTRADOR'],
