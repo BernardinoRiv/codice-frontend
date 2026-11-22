@@ -1,4 +1,4 @@
-import { normalizarCuenta, descargarPdf } from '../../utils/vistasSeguras';
+import { normalizarCuenta, abrirPdfNuevaPestana } from '../../utils/vistasSeguras';
 import { leerSesion } from '../../utils/sesion';
 import usePagoSeguro from '../../hooks/usePagoSeguro';
 import AvisoPagoPendiente from '../../components/AvisoPagoPendiente';
@@ -121,15 +121,10 @@ const EstadoCuentaEstudiante = () => {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/${idPago}/comprobante`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (response.ok) {
-        await descargarPdf(response, `comprobante-${idPago}.pdf`);
-        toast.success('Documento generado', { id: toastId });
-      } else {
-        toast.error('Error al generar el documento', { id: toastId });
-      }
-    } catch {
-      toast.error('Error de conexión al generar pdf', { id: toastId });
+      await abrirPdfNuevaPestana(response, `comprobante-${idPago}.pdf`);
+      toast.success('Documento generado', { id: toastId });
+    } catch (e) {
+      toast.error(e.message || 'Error al generar el documento', { id: toastId });
     }
   };
 

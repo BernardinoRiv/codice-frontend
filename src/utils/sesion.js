@@ -149,3 +149,18 @@ export function confirmarCambioPassword(data, tokenEsperado) {
   localStorage.setItem('ultimoAcceso', new Date().toISOString());
   notificar();
 }
+
+export function actualizarTokenSesion(nuevoToken) {
+  const payload = leerToken(nuevoToken);
+  if (!payload) throw new Error('El token de renovación no es válido.');
+  try {
+    localStorage.setItem('token', nuevoToken);
+    if (payload.idSesion !== undefined && payload.idSesion !== null) {
+      localStorage.setItem('idSesionActual', String(payload.idSesion));
+    }
+  } catch {
+    throw new Error('No se pudo actualizar la sesión.');
+  }
+  notificar();
+  return leerSesion();
+}

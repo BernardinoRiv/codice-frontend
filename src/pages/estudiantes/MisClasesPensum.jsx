@@ -154,6 +154,8 @@ const MisClasesPensum = () => {
     switch (estado?.toLowerCase()) {
       case 'aprobada':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'inscrita':
+        return 'bg-sky-50 text-sky-700 border-sky-300';
       case 'cursando':
         return 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-2 ring-indigo-400/30';
       case 'reprobada':
@@ -395,10 +397,14 @@ const MisClasesPensum = () => {
                       {materiasFiltradas.map((mat, idx) => {
                         const estadoActual = mat.estado?.toLowerCase();
                         const esCursando = estadoActual === 'cursando';
+                        const esInscrita = estadoActual === 'inscrita';
                         const esReprobada = estadoActual === 'reprobada';
                         const esRetirada = estadoActual === 'retirada';
                         const esRetiroPendiente = estadoActual === 'retiro pendiente';
                         const esAprobada = estadoActual === 'aprobada';
+                        const etiquetaEstado = esInscrita
+                          ? `inscrita${mat.codigoCicloInscrito ? ` · ${mat.codigoCicloInscrito}` : ''}`
+                          : mat.estado;
 
                         return (
                           <div 
@@ -406,6 +412,8 @@ const MisClasesPensum = () => {
                             className={`p-5 border transition-all flex flex-col justify-between ${
                               esCursando 
                                 ? 'bg-indigo-50/40 border-indigo-400/80 rounded-2xl shadow-sm ring-1 ring-indigo-400/20' 
+                                : esInscrita
+                                ? 'bg-sky-50/40 border-sky-300 rounded-2xl shadow-sm'
                                 : esReprobada
                                 ? 'bg-red-50/40 border-red-300 rounded-2xl shadow-sm'
                                 : esRetirada
@@ -423,7 +431,7 @@ const MisClasesPensum = () => {
                                   {mat.codigo}
                                 </span>
                                 <span className={`text-xs font-extrabold px-3 py-1 rounded-full border ${badgeEstadoStyle(mat.estado)}`}>
-                                  {mat.estado}
+                                  {etiquetaEstado}
                                 </span>
                               </div>
                               <h4 className={`text-sm font-bold leading-snug mb-3 ${esRetirada ? 'text-slate-500 line-through' : 'text-slate-900'}`}>

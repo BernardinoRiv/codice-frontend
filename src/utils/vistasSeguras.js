@@ -36,6 +36,27 @@ export async function descargarPdf(response, nombre) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+export async function abrirPdfNuevaPestana(response, nombreFallback = 'comprobante.pdf') {
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.mensaje || data?.message || data?.error || `No se pudo obtener el documento (${response.status}).`);
+  }
+  const raw = await response.blob();
+  if (!(await raw.slice(0, 5).text()).startsWith('%PDF-')) throw new Error('El servidor no devolvió un PDF válido.');
+  const blob = new Blob([raw], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombreFallback;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 export function generarClave() {
   const grupos = ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz', '0123456789', '!@#$%^&*()_+'];
   const indice = max => {
