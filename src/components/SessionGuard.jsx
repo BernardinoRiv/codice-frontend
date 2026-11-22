@@ -1,8 +1,8 @@
-  import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import useSesion from '../hooks/useSesion';
-import { leerSesion, limpiarSesion } from '../utils/sesion';
+import { actualizarTokenSesion, leerSesion, limpiarSesion } from '../utils/sesion';
 
 function describirTiempoRestante(milisegundos) {
   const totalSegundos = Math.max(1, Math.ceil(milisegundos / 1000));
@@ -19,8 +19,40 @@ export default function SessionGuard() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const avisos = useRef({ token: null, mostrados: new Set() });
+  const renovandoRef = useRef(false);
   const privada = pathname === '/forzar-password' || pathname === '/sin-permisos' ||
     pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+
+  const extenderSesion = async (expActual) => {
+    if (renovandoRef.current) return;
+    renovandoRef.current = true;
+    try {
+      const sesionActual = leerSesion();
+      const apiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+      const fetchOriginal = window[Symbol.for('codice.fetchInterceptor')]?.originalFetch || window.fetch.bind(window);
+      const response = await fetchOriginal(`${apiUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sesionActual.token}`,
+          Accept: 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        actualizarTokenSesion(data.token);
+        toast.dismiss(`sesion-aviso-${expActual}`);
+        toast.success('Sesión extendida', { description: 'Tu sesión se ha renovado correctamente.' });
+      } else {
+        throw new Error('refresh-failed');
+      }
+    } catch {
+      limpiarSesion();
+      navigate('/', { replace: true });
+      toast.error('No se pudo renovar la sesión', { description: 'Vuelve a iniciar sesión para continuar.' });
+    } finally {
+      renovandoRef.current = false;
+    }
+  };
 
   useEffect(() => {
     if (!privada) return;
@@ -39,7 +71,18 @@ export default function SessionGuard() {
       const umbral = restante <= 10000 ? 10000 : restante <= 60000 ? 60000 : restante <= 300000 ? 300000 : null;
       if (umbral !== null && !avisos.current.mostrados.has(umbral)) {
         [300000, 60000, 10000].filter(valor => valor >= umbral).forEach(valor => avisos.current.mostrados.add(valor));
-        toast.warning('Tu sesión está por expirar', { id: `sesion-aviso-${sesion.payload.exp}`, description: `Tu sesión terminará en ${describirTiempoRestante(restante)}. Guarda tus cambios antes de ese momento.`, duration: 10000 });
+        const puedeExtender = sesion.roles.includes('ESTUDIANTE') || sesion.roles.includes('DOCENTE');
+        toast.warning('Tu sesión está por expirar', {
+          id: `sesion-aviso-${sesion.payload.exp}`,
+          description: `Tu sesión terminará en ${describirTiempoRestante(restante)}. Guarda tus cambios antes de ese momento.`,
+          duration: puedeExtender ? 20000 : 10000,
+          ...(puedeExtender ? {
+            action: {
+              label: 'Extender sesión',
+              onClick: () => extenderSesion(sesion.payload.exp),
+            },
+          } : {}),
+        });
       }
       const demora = restante > 300000 ? restante - 300000
         : restante > 60000 ? restante - 60000

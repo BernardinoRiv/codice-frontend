@@ -26,6 +26,7 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
+import MatriculaContinua from './pages/estudiantes/MatriculaContinua';
 import Facturas from './pages/finanzas/Facturas';
 import GestionCarreras from './pages/academico/GestionCarreras';
 import GestionPensum from './pages/academico/GestionPensum';
@@ -46,6 +47,7 @@ const VISTAS = {
   'mis-notas': ConsultaNotas,
   'mi-estado-cuenta': EstadoCuentaEstudiante,
   'escanear-asistencia': EscanearAsistencia,
+  'matricula': MatriculaContinua,
   'notas': IngresoNotas,
   'asistencias': Asistencias,
   'pagos': VentanillaPagos,
