@@ -440,32 +440,39 @@ export default function DirectorioEstudiantes() {
             aria-labelledby="modal-titulo"
             className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-3">
-              <span className={`rounded-xl p-3 ${
-                modal.accion === "bloquear"
-                  ? "bg-rose-50 text-rose-700"
-                  : "bg-slate-100 text-slate-700"
-              }`}>
-                <ShieldCheck size={22} />
-              </span>
-              <button
-                onClick={cerrarModal}
-                disabled={procesando}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
-              >
-                <X size={19} />
-              </button>
-            </div>
-            <h3
-              id="modal-titulo"
-              className="mt-4 text-lg font-bold text-slate-900"
-            >
-              {modal.accion === "reset"
-                ? "Restablecer contraseña"
-                : modal.accion === "bloquear"
-                  ? "Bloquear cuenta"
-                  : "Desbloquear cuenta"}
-            </h3>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+                      modal.accion === "bloquear"
+                              ? "bg-rose-50 text-rose-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}>
+                            <ShieldCheck size={22} />
+                          </span>
+            
+                          <h3
+                            id="modal-titulo"
+                            className="text-lg font-bold text-slate-900"
+                          >
+                            {modal.accion === "reset"
+                              ? "Restablecer contraseña"
+                              : modal.accion === "bloquear"
+                                ? "Bloquear cuenta"
+                                : "Desbloquear cuenta"}
+                          </h3>
+                        </div>
+            
+                        <button
+                          type="button"
+                          onClick={cerrarModal}
+                          disabled={procesando}
+                          className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+                          aria-label="Cerrar modal"
+                        >
+                          <X size={19} />
+                        </button>
+                </div>
+            
             <p className="mt-2 text-sm leading-6 text-slate-500">
               {modal.estudiante.nombres} {modal.estudiante.apellidos} · {modal.estudiante.carnet}
             </p>

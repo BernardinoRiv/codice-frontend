@@ -32,6 +32,9 @@ import GestionPensum from './pages/academico/GestionPensum';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
 import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
+import DirectorioEmpleados from './pages/empleados/DirectorioEmpleados';
+import InformacionEmpleado from './pages/empleados/InformacionEmpleado';
+
 
 
 const VISTAS = {
@@ -55,7 +58,9 @@ const VISTAS = {
   'aranceles': CatalogoAranceles,
   'facturas': Facturas,
   'directorio-estudiantes': DirectorioEstudiantes,
-  'directorio-estudiantes/:idEstudiante': InformacionEstudiante
+  'directorio-estudiantes/:idEstudiante': InformacionEstudiante,
+  'directorio-empleados': DirectorioEmpleados,
+  'directorio-empleados/:idEmpleado': InformacionEmpleado
 };
 
 function RutaProtegida({ children }) {
