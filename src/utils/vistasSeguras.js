@@ -7,8 +7,11 @@ export function numeroMonetario(valor) {
 
 export function normalizarCuenta(data) {
   if (!data || !data.estudiante || !Array.isArray(data.cargosPendientes)) throw new Error('El estado de cuenta recibido no es válido.');
-  const convertir = objeto => Object.fromEntries(Object.entries(objeto).map(([clave, valor]) =>
-    /^(monto|deuda|saldo|totalPagado)/.test(clave) ? [clave, numeroMonetario(valor)] : [clave, valor]));
+  const convertir = objeto => Object.fromEntries(Object.entries(objeto).map(([clave, valor]) => {
+    if (!/^(monto|deuda|saldo|totalPagado)/.test(clave)) return [clave, valor];
+    if ((clave === 'montoDescuento' || clave === 'montoBase') && (valor === null || valor === undefined || valor === '')) return [clave, 0];
+    return [clave, numeroMonetario(valor)];
+  }));
   return {
     ...data,
     estudiante: { ...data.estudiante, nombreCompleto: String(data.estudiante.nombreCompleto ?? 'Estudiante') },
