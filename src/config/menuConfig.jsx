@@ -1,4 +1,4 @@
-import React from 'react';
+import { BookOpen } from 'lucide-react';
 
 export const menuMaestro = [
   // GENERAL
@@ -334,6 +334,13 @@ export const menuMaestro = [
         />
       </svg>
     ),
+  },
+
+  {
+    name: 'Gestión de materias',
+    path: '/dashboard/materias',
+    rolesPermitidos: ['ADMINISTRADOR'],
+    icon: <BookOpen className="h-5 w-5" strokeWidth={1.5} />,
   },
 
   // RECURSOS HUMANOS / PERSONAL

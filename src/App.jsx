@@ -30,6 +30,7 @@ import MatriculaContinua from './pages/estudiantes/MatriculaContinua';
 import Facturas from './pages/finanzas/Facturas';
 import GestionCarreras from './pages/academico/GestionCarreras';
 import GestionPensum from './pages/academico/GestionPensum';
+import GestionMaterias from './pages/academico/GestionMaterias';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
 import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
 import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
@@ -44,6 +45,7 @@ const VISTAS = {
   'registro-docente': RegistroDocente,
   'carreras': GestionCarreras,
   'pensum': GestionPensum,
+  'materias': GestionMaterias,
   'directorio-docentes': ListaDocentes,
   'nuevo-ingreso': RegistroNuevoIngreso,
   'oferta-academica': AperturaSeccion,
