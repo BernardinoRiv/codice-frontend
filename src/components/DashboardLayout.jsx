@@ -114,6 +114,39 @@ function DashboardLayout() {
   const currentVariant = isMobile ? (isMobileOpen ? "mobileOpen" : "mobileClosed") : (isMinimized ? "desktopClosed" : "desktopOpen");
   const visuallyMinimized = !isMobile && isMinimized;
 
+  const rutaActiva = path => location.pathname === path || location.pathname.startsWith(path + '/');
+  const gruposVisibles = {};
+  for (const item of navItems) {
+    if (item.grupo) (gruposVisibles[item.grupo] ??= []).push(item);
+  }
+  const enlace = item => {
+    const isActive = rutaActiva(item.path);
+    return (
+      <Link aria-label={item.name} aria-current={isActive ? "page" : undefined} key={item.path} to={item.path} onClick={() => isMobile && setIsMobileOpen(false)}>
+        <motion.div
+          whileHover={{ scale: 0.98 }}
+          whileTap={{ scale: 0.95 }}
+          className={`flex items-center py-2.5 font-semibold transition-all duration-200 cursor-pointer
+            ${isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}
+            ${visuallyMinimized ? 'justify-center px-0 rounded-xl mx-auto w-12' : 'px-4 rounded-[14px]'}
+          `}
+          title={visuallyMinimized ? item.name : ""} 
+        >
+          <span className={`flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}`}>
+            {item.icon}
+          </span>
+          <AnimatePresence>
+            {!visuallyMinimized && (
+              <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} className="whitespace-nowrap ml-3 text-[14px]">
+                {item.name}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </Link>
+    );
+  };
+
   return (
     <div className="flex h-[100dvh] bg-slate-50 font-sans text-slate-900 overflow-hidden relative">
 
@@ -183,33 +216,19 @@ function DashboardLayout() {
         {/* CONTENEDOR DE NAVEGACIÓN (Con scroll interno) */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <nav className={`mt-2 flex flex-col space-y-1.5 pb-4 ${visuallyMinimized ? 'px-3' : 'px-4'}`}>
-            {navItems.map((item) => {
-              const isActive = location.pathname.includes(item.path);
-              return (
-                <Link key={item.name} to={item.path} onClick={() => isMobile && setIsMobileOpen(false)}>
-                  <motion.div
-                    whileHover={{ scale: 0.98 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`flex items-center py-2.5 font-semibold transition-all duration-200 cursor-pointer
-                      ${isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}
-                      ${visuallyMinimized ? 'justify-center px-0 rounded-xl mx-auto w-12' : 'px-4 rounded-[14px]'}
-                    `}
-                    title={visuallyMinimized ? item.name : ""} 
-                  >
-                    <span className={`flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}`}>
-                      {item.icon}
-                    </span>
-                    <AnimatePresence>
-                      {!visuallyMinimized && (
-                        <motion.span initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} className="whitespace-nowrap ml-3 text-[14px]">
-                          {item.name}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                </Link>
-              );
-            })}
+            {visuallyMinimized ? navItems.map(enlace) : <>
+              {navItems.filter(item => !item.grupo).map(enlace)}
+              {Object.entries(gruposVisibles).map(([grupo, items]) => (
+                <details key={grupo + location.pathname} open={items.some(item => rutaActiva(item.path))}
+                  className="group rounded-xl">
+                  <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-500 [&::-webkit-details-marker]:hidden">
+                    {grupo}
+                    <span aria-hidden="true" className="text-slate-400 transition-transform group-open:rotate-90">›</span>
+                  </summary>
+                  <div className="ml-2 space-y-1 border-l border-slate-200 pl-1">{items.map(enlace)}</div>
+                </details>
+              ))}
+            </>}
           </nav>
         </div>
 

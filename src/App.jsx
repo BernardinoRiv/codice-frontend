@@ -12,7 +12,6 @@ import DashboardLayout from './components/DashboardLayout';
 import Inicio from './pages/inicio/Inicio'; 
 import IngresoNotas from './pages/docentes/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
-import ListaDocentes from './pages/docentes/ListaDocentes';
 import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/perfil/Ajustes';
@@ -36,6 +35,7 @@ import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
 import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
 import DirectorioEmpleados from './pages/empleados/DirectorioEmpleados';
 import InformacionEmpleado from './pages/empleados/InformacionEmpleado';
+import DirectorioDocentes, { InformacionDocente } from './pages/docentes/DirectorioDocentes';
 
 
 
@@ -46,7 +46,6 @@ const VISTAS = {
   'carreras': GestionCarreras,
   'pensum': GestionPensum,
   'materias': GestionMaterias,
-  'directorio-docentes': ListaDocentes,
   'nuevo-ingreso': RegistroNuevoIngreso,
   'oferta-academica': AperturaSeccion,
   'ciclos-planificacion': CiclosPlanificacion,
@@ -64,7 +63,9 @@ const VISTAS = {
   'directorio-estudiantes': DirectorioEstudiantes,
   'directorio-estudiantes/:idEstudiante': InformacionEstudiante,
   'directorio-empleados': DirectorioEmpleados,
-  'directorio-empleados/:idEmpleado': InformacionEmpleado
+  'directorio-empleados/:idEmpleado': InformacionEmpleado,
+  'directorio-docentes': DirectorioDocentes,
+'directorio-docentes/:idDocente': InformacionDocente,
 };
 
 function RutaProtegida({ children }) {

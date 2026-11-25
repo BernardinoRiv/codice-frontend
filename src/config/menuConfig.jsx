@@ -35,6 +35,7 @@ export const menuMaestro = [
   {
     name: 'Mis clases y pensum',
     path: '/dashboard/clases',
+    grupo: 'Mi área estudiantil',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
@@ -56,6 +57,7 @@ export const menuMaestro = [
   {
     name: 'Mis calificaciones',
     path: '/dashboard/mis-notas',
+    grupo: 'Mi área estudiantil',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
@@ -77,6 +79,7 @@ export const menuMaestro = [
   {
     name: 'Mi estado de cuenta',
     path: '/dashboard/mi-estado-cuenta',
+    grupo: 'Mi área estudiantil',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
@@ -98,6 +101,7 @@ export const menuMaestro = [
   {
     name: 'Registrar asistencia',
     path: '/dashboard/escanear-asistencia',
+    grupo: 'Mi área estudiantil',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
@@ -124,6 +128,7 @@ export const menuMaestro = [
   {
     name: 'Inscripción de materias',
     path: '/dashboard/matricula',
+    grupo: 'Mi área estudiantil',
     rolesPermitidos: ['ESTUDIANTE'],
     icon: (
       <svg
@@ -147,6 +152,7 @@ export const menuMaestro = [
   {
     name: 'Ingreso de notas',
     path: '/dashboard/notas',
+    grupo: 'Docencia',
     rolesPermitidos: ['DOCENTE'],
     icon: (
       <svg
@@ -168,6 +174,7 @@ export const menuMaestro = [
   {
     name: 'Asistencias',
     path: '/dashboard/asistencias',
+    grupo: 'Docencia',
     rolesPermitidos: ['DOCENTE'],
     icon: (
       <svg
@@ -191,6 +198,7 @@ export const menuMaestro = [
   {
     name: 'Ingreso de aspirantes',
     path: '/dashboard/nuevo-ingreso',
+    grupo: 'Admisión y estudiantes',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
@@ -212,6 +220,7 @@ export const menuMaestro = [
   {
     name: 'Directorio de estudiantes',
     path: '/dashboard/directorio-estudiantes',
+    grupo: 'Admisión y estudiantes',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
@@ -233,6 +242,7 @@ export const menuMaestro = [
   {
     name: 'Oferta académica',
     path: '/dashboard/oferta-academica',
+    grupo: 'Planificación académica',
     rolesPermitidos: ['REGISTRO_ACADEMICO', 'EMPLEADO', 'ADMINISTRADOR'],
     icon: (
       <svg
@@ -254,6 +264,7 @@ export const menuMaestro = [
   {
     name: 'Ciclos en planificación',
     path: '/dashboard/ciclos-planificacion',
+    grupo: 'Planificación académica',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
@@ -275,6 +286,7 @@ export const menuMaestro = [
   {
     name: 'Gestión de secciones',
     path: '/dashboard/gestion-secciones',
+    grupo: 'Planificación académica',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO', 'EMPLEADO'],
     icon: (
       <svg
@@ -296,6 +308,7 @@ export const menuMaestro = [
   {
     name: 'Gestión de carreras',
     path: '/dashboard/carreras',
+    grupo: 'Planes de estudio',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
@@ -317,6 +330,7 @@ export const menuMaestro = [
   {
     name: 'Gestión de pensum',
     path: '/dashboard/pensum',
+    grupo: 'Planes de estudio',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
@@ -339,6 +353,7 @@ export const menuMaestro = [
   {
     name: 'Gestión de materias',
     path: '/dashboard/materias',
+    grupo: 'Planes de estudio',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: <BookOpen className="h-5 w-5" strokeWidth={1.5} />,
   },
@@ -347,6 +362,7 @@ export const menuMaestro = [
   {
     name: 'Registro de empleado',
     path: '/dashboard/registro-empleados',
+    grupo: 'Personal',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
@@ -368,6 +384,7 @@ export const menuMaestro = [
   {
     name: 'Directorio de empleados',
     path: '/dashboard/directorio-empleados',
+    grupo: 'Personal',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'],
     icon: (
       <svg
@@ -389,6 +406,7 @@ export const menuMaestro = [
   {
     name: 'Registro de docente',
     path: '/dashboard/registro-docente',
+    grupo: 'Personal',
     rolesPermitidos: ['ADMINISTRADOR'],
     icon: (
       <svg
@@ -411,6 +429,7 @@ export const menuMaestro = [
   {
     name: 'Directorio de docentes',
     path: '/dashboard/directorio-docentes',
+    grupo: 'Personal',
     rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'],
     icon: (
       <svg
@@ -434,6 +453,7 @@ export const menuMaestro = [
   {
     name: 'Pagos y aranceles',
     path: '/dashboard/pagos',
+    grupo: 'Finanzas',
     rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
@@ -455,6 +475,7 @@ export const menuMaestro = [
   {
     name: 'Aranceles',
     path: '/dashboard/aranceles',
+    grupo: 'Finanzas',
     rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
@@ -476,6 +497,7 @@ export const menuMaestro = [
   {
     name: 'Facturas',
     path: '/dashboard/facturas',
+    grupo: 'Finanzas',
     rolesPermitidos: ['FINANZAS', 'ADMINISTRADOR'],
     icon: (
       <svg
