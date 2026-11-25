@@ -9,9 +9,11 @@ import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
 import RecuperarPassword from './pages/auth/RecuperarPassword';
 import DashboardLayout from './components/DashboardLayout';
+import NotFound from './pages/NotFound';
 import Inicio from './pages/inicio/Inicio'; 
 import IngresoNotas from './pages/docentes/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
+import DirectorioDocentes, { InformacionDocente } from './pages/docentes/DirectorioDocentes';
 import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/perfil/Ajustes';
@@ -35,7 +37,6 @@ import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
 import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
 import DirectorioEmpleados from './pages/empleados/DirectorioEmpleados';
 import InformacionEmpleado from './pages/empleados/InformacionEmpleado';
-import DirectorioDocentes, { InformacionDocente } from './pages/docentes/DirectorioDocentes';
 
 
 
@@ -46,6 +47,8 @@ const VISTAS = {
   'carreras': GestionCarreras,
   'pensum': GestionPensum,
   'materias': GestionMaterias,
+  'directorio-docentes': DirectorioDocentes,
+  'directorio-docentes/:idDocente': InformacionDocente,
   'nuevo-ingreso': RegistroNuevoIngreso,
   'oferta-academica': AperturaSeccion,
   'ciclos-planificacion': CiclosPlanificacion,
@@ -63,9 +66,7 @@ const VISTAS = {
   'directorio-estudiantes': DirectorioEstudiantes,
   'directorio-estudiantes/:idEstudiante': InformacionEstudiante,
   'directorio-empleados': DirectorioEmpleados,
-  'directorio-empleados/:idEmpleado': InformacionEmpleado,
-  'directorio-docentes': DirectorioDocentes,
-'directorio-docentes/:idDocente': InformacionDocente,
+  'directorio-empleados/:idEmpleado': InformacionEmpleado
 };
 
 function RutaProtegida({ children }) {
@@ -134,8 +135,9 @@ function App() {
             const Componente = VISTAS[path];
             return <Route key={path} path={path} element={<RutaPorRol rolesPermitidos={roles}><Componente /></RutaPorRol>} />;
           }))}
+          <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
