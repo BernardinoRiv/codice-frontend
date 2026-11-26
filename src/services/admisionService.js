@@ -202,8 +202,11 @@ export const admisionService = {
     }),
 
   // Consulta los aranceles sin crear una prematrícula.
-  consultarPlanFinanciero: (options) =>
-    request("/api/v1/public/admision-online/plan-financiero", options),
+  consultarPlanFinanciero: (idCarreraSede, options) =>
+    request(
+      `/api/v1/public/admision-online/plan-financiero?${query({ idCarreraSede })}`,
+      options,
+    ),
 
   procesarPreMatricula: (payload) =>
     request("/api/v1/public/admision-online/pre-matricular", {

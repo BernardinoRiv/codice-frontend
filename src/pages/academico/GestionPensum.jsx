@@ -1017,7 +1017,7 @@ export default function GestionPensum() {
                                     <Icono nombre="archivo" size={16} /> Ver
                                     pensum
                                   </button>
-                                  {version.estadoPensum === "PLANIFICANDO" && (
+                                  {["PLANIFICANDO", "PENDIENTE_APROBACION"].includes(version.estadoPensum) && (
                                     <button
                                       type="button"
                                       onClick={() => setPensumEliminar(version)}
