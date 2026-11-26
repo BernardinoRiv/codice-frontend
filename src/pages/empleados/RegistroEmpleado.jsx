@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { ROLES } from "../../utils/sesion";
 import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -243,6 +245,10 @@ function SelectBuscador({
 }
 
 function RegistroEmpleado() {
+  const { roles, payload } = useSesion();
+  const sedeRestringida = roles.includes(ROLES.EMPLEADO);
+  const sedeAsignada = String(payload?.idSede ?? '');
+
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
   const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18));
@@ -281,6 +287,9 @@ function RegistroEmpleado() {
     idSede: '',
     idCargo: ''
   });
+
+  const idSedeRegistro = sedeRestringida ? sedeAsignada : formData.idSede;
+
 
   const esEmpleadoActivo = rolesActuales.some(r => typeof r === 'string' && r.toUpperCase().includes('EMPLEADO'));
 
@@ -584,7 +593,7 @@ function RegistroEmpleado() {
 
   const c3 = [
     String(formData.idArea || '').trim() !== '',
-    String(formData.idSede || '').trim() !== '',
+    String(idSedeRegistro || '').trim() !== '',
     String(formData.idCargo || '').trim() !== ''
   ].filter(Boolean).length;
 
@@ -636,7 +645,7 @@ function RegistroEmpleado() {
         sexo: formData.sexo,
         idDistrito: parseInt(formData.idDistrito, 10),
         idArea: parseInt(formData.idArea, 10),
-        idSede: parseInt(formData.idSede, 10),
+        idSede: Number(idSedeRegistro),
         idCargo: parseInt(formData.idCargo, 10),
         fechaFin: new Date().toISOString().split('T')[0],
         fechasValidas: true
@@ -694,8 +703,8 @@ function RegistroEmpleado() {
   };
 
   const getSedeTexto = () => {
-    if (!formData.idSede) return '---';
-    const sedeEncontrada = catalogos.sedes?.find(s => String(s.id) === String(formData.idSede));
+    if (!idSedeRegistro) return '---';
+    const sedeEncontrada = catalogos.sedes?.find(s => String(s.id) === String(idSedeRegistro));
     return sedeEncontrada ? sedeEncontrada.nombre : '---';
   };
 
@@ -1028,12 +1037,14 @@ function RegistroEmpleado() {
                   <div className="md:col-span-1">
                     <SelectBuscador
                       label="Sede Operativa"
-                      value={formData.idSede}
+                      value={idSedeRegistro}
                       onChange={(val) => setFormData(prev => ({ ...prev, idSede: val }))}
-                      options={catalogos.sedes}
+                      options={sedeRestringida
+                        ? [{ id: sedeAsignada, nombre: payload?.nombreSede || 'Sede asignada' }]
+                        : catalogos.sedes}
                       placeholder="-- Seleccione sede --"
                       searchPlaceholder="Buscar sede..."
-                      disabled={!documentoVerificado || isLoadingCatalogos || esEmpleadoActivo}
+                      disabled={sedeRestringida || !documentoVerificado || isLoadingCatalogos || esEmpleadoActivo}
                     />
                   </div>
 

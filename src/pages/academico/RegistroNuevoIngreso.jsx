@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { ROLES } from "../../utils/sesion";
 import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -72,19 +74,6 @@ const esTelefonoValido = (telefono) => {
 const esCorreoValido = correo => validarCorreoRegistro(correo) === '';
 
 const calcularFechaMaxima = edadMinima => limitesFechaNacimiento(edadMinima).max;
-
-const obtenerSedeDesdeToken = () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return '';
-    const payloadBase64 = token.split('.')[1];
-    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-    const decodedJson = JSON.parse(atob(base64));
-    return decodedJson.idSede || decodedJson.sedeId || decodedJson.id_sede || '';
-  } catch (e) {
-    return '';
-  }
-};
 
 const numeroArancel = (valor) => {
   const numero = Number(valor);
@@ -284,6 +273,10 @@ function FilaResumen({ etiqueta, valor, tipo = 'normal', conBorde = false }) {
 }
 
 export default function RegistroNuevoIngreso() {
+  const { roles, payload } = useSesion();
+  const sedeRestringida = roles.includes(ROLES.EMPLEADO);
+  const sedeAsignada = String(payload?.idSede ?? '');
+
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
   const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18));
@@ -310,9 +303,38 @@ export default function RegistroNuevoIngreso() {
   const [formData, setFormData] = useState({
     idPersona: null, idTipoDocumento: '', numeroDocumento: '', nombres: '', apellidos: '',
     fechaNacimiento: '', sexo: '', telefono: '', correoPersonal: '', idDepartamento: '', idDistrito: '', direccion: '',
-    idSede: obtenerSedeDesdeToken(),
+    idSede: sedeAsignada,
     idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
   });
+
+  const idSedeRegistro = sedeRestringida ? sedeAsignada : formData.idSede;
+  const [carrerasSede, setCarrerasSede] = useState([]);
+
+  useEffect(() => {
+    if (!idSedeRegistro) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ idSede: idSedeRegistro });
+
+    fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/carreras-por-sede?${params}`, {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }).then(async response => {
+      if (!response.ok) throw new Error('No se pudieron cargar las carreras de la sede.');
+      const carreras = await response.json();
+      if (!controller.signal.aborted) setCarrerasSede(Array.isArray(carreras) ? carreras : []);
+    }).catch(error => {
+      if (!controller.signal.aborted) toast.error(error.message);
+    });
+
+    return () => controller.abort();
+  }, [idSedeRegistro]);
+
+  const cambiarSede = idSede => {
+    setCarrerasSede([]);
+    setOfertaAcademica([]);
+    setFormData(prev => ({ ...prev, idSede, idCarreraSede: '', idPensum: '', idGruposSeleccionados: [] }));
+  };
+
 
   useEffect(() => () => {
     if (urlComprobanteLocalRef.current) URL.revokeObjectURL(urlComprobanteLocalRef.current);
@@ -348,7 +370,7 @@ export default function RegistroNuevoIngreso() {
     const fetchCatalogos = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -458,33 +480,43 @@ export default function RegistroNuevoIngreso() {
       setFormData(p => ({ ...p, idPensum: '' }));
       return;
     }
+    const controller = new AbortController();
     const fetchPensum = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${formData.idCarreraSede}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${formData.idCarreraSede}`, { signal: controller.signal, headers: { 'Authorization': `Bearer ${token}` } });
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const data = await res.json();
+          if (controller.signal.aborted) return;
           setPensumVigente(data);
-          setFormData(p => ({ ...p, idPensum: data.idPensum })); 
+          setFormData(p => ({ ...p, idPensum: data.idPensum }));
         } else {
           toast.error("Atención", { description: "No hay un plan de estudios activo configurado para esta carrera." });
           setPensumVigente(null);
           setFormData(p => ({ ...p, idPensum: '' }));
         }
-      } catch (error) { toast.error("Error al consultar el pensum."); }
+      } catch { if (!controller.signal.aborted) toast.error("Error al consultar el pensum."); }
     };
     fetchPensum();
+    return () => controller.abort();
   }, [formData.idCarreraSede]);
 
   useEffect(() => {
-    if (!formData.idPensum || !formData.idSede) { setOfertaAcademica([]); return; }
+    if (!formData.idPensum || !idSedeRegistro) {
+      setOfertaAcademica([]);
+      setCargandoOferta(false);
+      return;
+    }
+    const controller = new AbortController();
     const fetchOferta = async () => {
       setCargandoOferta(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/nuevo-ingreso?idPensum=${formData.idPensum}&idSede=${formData.idSede}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/nuevo-ingreso?idPensum=${formData.idPensum}&idSede=${idSedeRegistro}`, { signal: controller.signal, headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
+          if (controller.signal.aborted) return;
           
           const dataOrdenada = data.map(materia => {
             return {
@@ -511,10 +543,15 @@ export default function RegistroNuevoIngreso() {
           setOfertaAcademica(dataOrdenada);
           setFormData(prev => ({ ...prev, idGruposSeleccionados: [] }));
         }
-      } catch (error) { toast.error('Error al cargar horarios.'); } finally { setCargandoOferta(false); }
+      } catch {
+        if (!controller.signal.aborted) toast.error('Error al cargar horarios.');
+      } finally {
+        if (!controller.signal.aborted) setCargandoOferta(false);
+      }
     };
     fetchOferta();
-  }, [formData.idPensum, formData.idSede]);
+    return () => controller.abort();
+  }, [formData.idPensum, idSedeRegistro]);
 
   const handleReset = () => {
     toast.dismiss();
@@ -528,7 +565,7 @@ export default function RegistroNuevoIngreso() {
     setTipoBeca('1');
     setPromocionSeleccionada('');
     setFormData(prev => ({
-      idPersona: null, idTipoDocumento: prev.idTipoDocumento, numeroDocumento: '', nombres: '', apellidos: '',
+      idPersona: null, idSede: prev.idSede, idTipoDocumento: prev.idTipoDocumento, numeroDocumento: '', nombres: '', apellidos: '',
       fechaNacimiento: '', sexo: '', telefono: '', correoPersonal: '', idDepartamento: '', idDistrito: '', direccion: '',
       idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
     }));
@@ -687,7 +724,7 @@ export default function RegistroNuevoIngreso() {
           ...formData,
           idTipoDocumento: Number(formData.idTipoDocumento),
           idDistrito: Number(formData.idDistrito),
-          idSede: Number(formData.idSede),
+          idSede: Number(idSedeRegistro),
           idCarreraSede: Number(formData.idCarreraSede),
           idPensum: Number(formData.idPensum),
           tipoBeca: idBeneficioFinal
@@ -715,7 +752,7 @@ export default function RegistroNuevoIngreso() {
     }
   };
 
-  const carreraSeleccionada = catalogos.carreras?.find(c => String(c.idCarreraSede ?? c.id) === String(formData.idCarreraSede));
+  const carreraSeleccionada = carrerasSede.find(c => String(c.idCarreraSede ?? c.id) === String(formData.idCarreraSede));
   const nivelSeleccionado = esCarreraPosgrado(carreraSeleccionada) ? 'POSGRADO' : 'PREGRADO';
   const arancelesCiclo = useMemo(() => {
     const esPosgrado = nivelSeleccionado === 'POSGRADO';
@@ -821,7 +858,7 @@ export default function RegistroNuevoIngreso() {
 
   const c1 = [formData.nombres, formData.apellidos, formData.idTipoDocumento, docValido, !errorNacimiento, formData.sexo].filter(Boolean).length;
   const c2 = [esTelefonoValido(formData.telefono), esCorreoValido(formData.correoPersonal), formData.idDepartamento, formData.idDistrito, formData.direccion].filter(Boolean).length;
-  const c3 = [formData.idSede, formData.idCarreraSede, formData.idPensum, formData.idGruposSeleccionados.length > 0].filter(Boolean).length;
+  const c3 = [idSedeRegistro, formData.idCarreraSede, formData.idPensum, formData.idGruposSeleccionados.length > 0].filter(Boolean).length;
 
   const getStatus1 = () => (c1 === 6 && documentoVerificado) ? { state: 'complete' } : (c1 > 0 ? { state: 'active', pct: Math.round((c1 / 6) * 100) } : { state: 'idle' });
   const getStatus2 = () => (c2 === 5 && documentoVerificado) ? { state: 'complete' } : (c2 > 0 ? { state: 'active', pct: Math.round((c2 / 5) * 100) } : { state: 'idle' });
@@ -861,8 +898,8 @@ export default function RegistroNuevoIngreso() {
   const getNombreCompleto = () => (!formData.nombres && !formData.apellidos) ? 'Perfil de aspirante' : `${formData.nombres} ${formData.apellidos}`;
   const getPreviewCodigo = () => formData.nombres ? `ASP-${new Date().getFullYear()}-XXXX` : `ASP-YYYY-XXXX`;
   const getPreviewEmail = () => (!formData.nombres || !formData.apellidos) ? 'usuario@uma.edu.sv' : `${formData.nombres.trim().charAt(0).toLowerCase()}.${formData.apellidos.trim().split(' ')[0].toLowerCase()}@uma.edu.sv`;
-  const getCarreraTexto = () => !formData.idCarreraSede ? '---' : (catalogos.carreras?.find(a => String(a.idCarreraSede) === String(formData.idCarreraSede))?.nombreCarrera || '---');
-  const getSedeTexto = () => !formData.idSede ? '---' : (catalogos.sedes?.find(s => String(s.id) === String(formData.idSede))?.nombre || '---');
+  const getCarreraTexto = () => !formData.idCarreraSede ? '---' : (carrerasSede.find(a => String(a.idCarreraSede) === String(formData.idCarreraSede))?.nombreCarrera || '---');
+  const getSedeTexto = () => !idSedeRegistro ? '---' : (catalogos.sedes?.find(s => String(s.id) === String(idSedeRegistro))?.nombre || payload?.nombreSede || '---');
 
   const inputClass = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed placeholder-slate-400";
   const labelClass = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
@@ -960,8 +997,8 @@ export default function RegistroNuevoIngreso() {
           <div className={`transition-opacity duration-300 ${(!documentoVerificado || personaExistente) ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Proyección académica</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-              <div className="md:col-span-1"><SelectBuscador label="Sede operativa" disabled={true} value={formData.idSede} onChange={v => setFormData(p => ({...p, idSede: v}))} options={catalogos.sedes} placeholder="-- Sede --" /></div>
-              <div className="md:col-span-1"><SelectBuscador label="Carrera solicitada" disabled={personaExistente} value={formData.idCarreraSede} onChange={v => setFormData(p => ({...p, idCarreraSede: v}))} options={catalogos.carreras} placeholder="-- Seleccione carrera --" searchPlaceholder="Buscar carrera..." /></div>
+              <div className="md:col-span-1"><SelectBuscador label="Sede operativa" disabled={sedeRestringida} value={idSedeRegistro} onChange={cambiarSede} options={sedeRestringida ? [{ id: sedeAsignada, nombre: payload?.nombreSede || 'Sede asignada' }] : catalogos.sedes} placeholder="-- Sede --" /></div>
+              <div className="md:col-span-1"><SelectBuscador label="Carrera solicitada" disabled={personaExistente || !idSedeRegistro} value={formData.idCarreraSede} onChange={v => setFormData(p => ({...p, idCarreraSede: v, idPensum: '', idGruposSeleccionados: []}))} options={carrerasSede} placeholder="-- Seleccione carrera --" searchPlaceholder="Buscar carrera..." /></div>
               <div className="md:col-span-1"><label className={labelClass}>Pensum vigente</label><div className={`w-full h-[50px] bg-slate-50/50 border border-slate-200 rounded-xl px-4 flex items-center text-base cursor-not-allowed ${pensumVigente ? 'text-slate-900 font-extrabold' : 'text-slate-500 font-medium'}`}>{pensumVigente ? `Plan ${pensumVigente.version}` : '-- Autocompletado --'}</div></div>
             </div>
           </div>
