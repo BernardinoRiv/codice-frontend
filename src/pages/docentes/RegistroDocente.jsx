@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { ROLES } from "../../utils/sesion";
 import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -242,6 +244,10 @@ function SelectBuscador({
 }
 
 function RegistroDocente() {
+  const { roles, payload } = useSesion();
+  const sedeRestringida = roles.includes(ROLES.EMPLEADO);
+  const sedeAsignada = String(payload?.idSede ?? '');
+
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
   const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18)); // Modificado
@@ -279,6 +285,9 @@ function RegistroDocente() {
     idTipoContratacion: '',
     especialidad: ''
   });
+
+  const idSedeRegistro = sedeRestringida ? sedeAsignada : formData.idSede;
+
 
   const esDocenteActivo = rolesActuales.some(r => typeof r === 'string' && r.toUpperCase().includes('DOCENTE'));
 
@@ -594,7 +603,7 @@ function RegistroDocente() {
   ].filter(Boolean).length;
 
   const c3 = [
-    String(formData.idSede || '').trim() !== '',
+    String(idSedeRegistro || '').trim() !== '',
     String(formData.idTipoContratacion || '').trim() !== '',
     String(formData.especialidad || '').trim() !== ''
   ].filter(Boolean).length;
@@ -647,7 +656,7 @@ function RegistroDocente() {
         direccion: formData.direccion.trim(),
         sexo: formData.sexo,
         idDistrito: parseInt(formData.idDistrito, 10),
-        idSede: parseInt(formData.idSede, 10),
+        idSede: Number(idSedeRegistro),
         idTipoContratacion: parseInt(formData.idTipoContratacion, 10),
         especialidad: formData.especialidad.trim(),
         fechaInicio: new Date().toISOString().split('T')[0],
@@ -692,8 +701,8 @@ function RegistroDocente() {
   const getPreviewCodigo = () => formData.nombres ? `DOC-${new Date().getFullYear()}-XXXX` : `DOC-YYYY-XXXX`;
 
   const getSedeTexto = () => {
-    if (!formData.idSede) return '---';
-    const sedeEncontrada = catalogos.sedes?.find(s => String(s.id) === String(formData.idSede));
+    if (!idSedeRegistro) return '---';
+    const sedeEncontrada = catalogos.sedes?.find(s => String(s.id) === String(idSedeRegistro));
     return sedeEncontrada ? sedeEncontrada.nombre : '---';
   };
 
@@ -1031,12 +1040,14 @@ function RegistroDocente() {
                   <div>
                     <SelectBuscador
                       label="Sede asignada"
-                      value={formData.idSede}
+                      value={idSedeRegistro}
                       onChange={(val) => setFormData(prev => ({ ...prev, idSede: val }))}
-                      options={catalogos.sedes}
+                      options={sedeRestringida
+                        ? [{ id: sedeAsignada, nombre: payload?.nombreSede || 'Sede asignada' }]
+                        : catalogos.sedes}
                       placeholder="-- Seleccione sede --"
                       searchPlaceholder="Buscar sede..."
-                      disabled={!documentoVerificado || isLoadingCatalogos || esDocenteActivo}
+                      disabled={sedeRestringida || !documentoVerificado || isLoadingCatalogos || esDocenteActivo}
                     />
                   </div>
                   

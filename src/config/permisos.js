@@ -8,7 +8,8 @@ export const GRUPOS_RUTAS = [
   { nombre: 'Gestión académica', roles: [ROLES.ADMINISTRADOR, ROLES.REGISTRO_ACADEMICO], rutas: ['nuevo-ingreso', 'oferta-academica', 'ciclos-planificacion', 'gestion-secciones', 'directorio-estudiantes', 'directorio-estudiantes/:idEstudiante', 'directorio-empleados', 'directorio-empleados/:idEmpleado'] },
   { nombre: 'Estudiantes', roles: [ROLES.ESTUDIANTE], rutas: ['clases', 'mis-notas', 'mi-estado-cuenta', 'escanear-asistencia', 'matricula'] },
   { nombre: 'Docentes', roles: [ROLES.DOCENTE], rutas: ['notas', 'asistencias'] },
-  { nombre: 'Finanzas', roles: [ROLES.FINANZAS, ROLES.ADMINISTRADOR], rutas: ['pagos', 'aranceles', 'facturas'] },
+  { nombre: 'Ventanilla', roles: [ROLES.FINANZAS], rutas: ['pagos'] },
+  { nombre: 'Finanzas', roles: [ROLES.FINANZAS, ROLES.ADMINISTRADOR], rutas: ['aranceles', 'facturas'] },
 ];
 
 export const PERMISOS_RUTAS = Object.fromEntries(
