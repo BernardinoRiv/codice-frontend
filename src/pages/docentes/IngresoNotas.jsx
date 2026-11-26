@@ -3,6 +3,9 @@ import { toast } from 'sonner';
 import { notaValida } from '../../utils/vistasSeguras';
 import { leerExcelNotas } from '../../utils/leerExcelNotas';
 
+const MIN_CARACTERES = 15;
+const MAX_CARACTERES = 250;
+
 const IngresoNotas = () => {
   const [grupos, setGrupos] = useState([]);
   const [grupoSeleccionado, setGrupoSeleccionado] = useState(null);
@@ -27,6 +30,12 @@ const IngresoNotas = () => {
   const archivoRef = useRef(0);
   const originalesRef = useRef({});
   const [hayCambios, setHayCambios] = useState(false);
+  const [solicitudEvaluacion, setSolicitudEvaluacion] = useState(null);
+  const [alumnosSeleccionados, setAlumnosSeleccionados] = useState([]);
+  const [todosLosAlumnos, setTodosLosAlumnos] = useState(false);
+  const [motivoSolicitud, setMotivoSolicitud] = useState('');
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
+  const [ahora] = useState(() => Date.now());
 
   useEffect(() => () => { cargaRef.current++; archivoRef.current++; }, []);
   useEffect(() => {
@@ -166,6 +175,39 @@ const IngresoNotas = () => {
     return { estado: 'activo', mensaje: diasRestantes > 0 ? `Vence en ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}` : 'Vence hoy', puedeEditar: true, puedePublicar: true };
   };
 
+  const formatearFechaHora = (valor) => {
+    if (!valor) return '';
+    if (Array.isArray(valor)) {
+      const [anio, mes, dia, hora = 0, minuto = 0] = valor;
+      return `${dia}/${mes}/${anio} ${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`;
+    }
+    const texto = String(valor).trim();
+    const coincidencia = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(texto);
+    if (coincidencia) {
+      const [, anio, mes, dia, hora, minuto] = coincidencia;
+      return `${dia}/${mes}/${anio} ${hora}:${minuto}`;
+    }
+    const fecha = parseDate(valor);
+    return isNaN(fecha.getTime()) ? '' : fecha.toLocaleString('es-ES');
+  };
+
+  const estaHabilitadaPorSolicitud = (calif) => {
+    if (!calif?.habilitadaPorSolicitudHasta) return false;
+    const limite = parseDate(calif.habilitadaPorSolicitudHasta);
+    return !isNaN(limite.getTime()) && limite.getTime() > ahora;
+  };
+
+  const tieneSolicitudPendiente = (calif) => calif?.estadoSolicitudActual === 'PENDIENTE';
+
+  const puedeEditarCalificacion = (evalItem, calif) => getEstadoEvaluacion(evalItem).puedeEditar || estaHabilitadaPorSolicitud(calif);
+
+  const evaluacionesPublicables = evaluaciones.filter(evalItem => {
+    if (getEstadoEvaluacion(evalItem).estado === 'activo') return true;
+    return Object.values(calificaciones).some(calif =>
+      calif?.idEvaluacion === evalItem.idEvaluacion && estaHabilitadaPorSolicitud(calif)
+    );
+  });
+
   const getEvaluacionesPorPeriodo = (periodo) => evaluaciones.filter(ev => ev.periodo === periodo);
 
   const handleNotaChange = (idInscripcion, idEvaluacion, valor) => {
@@ -178,7 +220,8 @@ const IngresoNotas = () => {
     }
 
     if (escrituraRef.current) return;
-    if (!getEstadoEvaluacion(evaluaciones.find(ev => ev.idEvaluacion === idEvaluacion)).puedeEditar) return;
+    const clave = `${idInscripcion}-${idEvaluacion}`;
+    if (!puedeEditarCalificacion(evaluaciones.find(ev => ev.idEvaluacion === idEvaluacion), calificaciones[clave])) return;
     setHayCambios(true);
     const key = `${idInscripcion}-${idEvaluacion}`;
     setCalificaciones(prev => ({
@@ -231,7 +274,7 @@ const IngresoNotas = () => {
   const guardarPendientes = async () => {
     const cambios = pendientes();
     if (cambios.some(calif => !notaValida(calif.nota))) throw new Error('Cada nota editada debe tener un valor de 0 a 10 con máximo un decimal. No se puede borrar una nota guardada desde esta vista.');
-    if (cambios.some(calif => !getEstadoEvaluacion(evaluaciones.find(ev => ev.idEvaluacion === calif.idEvaluacion)).puedeEditar)) throw new Error('Una evaluación editada ya cerró su plazo. Revisa las fechas antes de guardar.');
+    if (cambios.some(calif => !puedeEditarCalificacion(evaluaciones.find(ev => ev.idEvaluacion === calif.idEvaluacion), calif))) throw new Error('Una evaluación editada ya cerró su plazo y no tiene autorización vigente. Revisa las fechas antes de guardar.');
     let guardadas = 0;
     for (const calif of cambios) {
       try {
@@ -266,14 +309,14 @@ const IngresoNotas = () => {
 
   const publicarCalificacionesActivas = async () => {
     if (escrituraRef.current || cargando) return;
-    const activas = evaluaciones.filter(ev => getEstadoEvaluacion(ev).estado === 'activo');
-    if (!activas.length) return toast.error('No hay evaluaciones activas para publicar.');
-    if (!window.confirm('¿Guardar los cambios y publicar las evaluaciones activas? Los estudiantes podrán ver las notas.')) return;
+    const publicables = evaluacionesPublicables;
+    if (!publicables.length) return toast.error('No hay evaluaciones activas ni autorizaciones vigentes para publicar.');
+    if (!window.confirm('¿Guardar los cambios y publicar las evaluaciones habilitadas? Los estudiantes podrán ver las notas.')) return;
     escrituraRef.current = true; setPublicando(true);
     let publicadas = 0;
     try {
       await guardarPendientes();
-      for (const ev of activas) {
+      for (const ev of publicables) {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/evaluaciones/${ev.idEvaluacion}/publicar`, { method: 'POST' });
         const texto = await response.text();
         const data = texto ? JSON.parse(texto) : {};
@@ -284,7 +327,7 @@ const IngresoNotas = () => {
       setModoEdicionGlobal(false);
       await cargarDatosGrupo();
     } catch (error) {
-      toast.error(`Publicación incompleta: ${publicadas} de ${activas.length} confirmadas`, { description: `${error.message} Revisa las notas antes de reintentar.`, duration: 12000 });
+      toast.error(`Publicación incompleta: ${publicadas} de ${publicables.length} confirmadas`, { description: `${error.message} Revisa las notas antes de reintentar.`, duration: 12000 });
     } finally { escrituraRef.current = false; setPublicando(false); }
   };
 
@@ -614,6 +657,75 @@ const IngresoNotas = () => {
     setEvaluacionesEnPrevisualizacion([]);
   };
 
+  const abrirModalSolicitud = (evalItem) => {
+    setSolicitudEvaluacion(evalItem);
+    setAlumnosSeleccionados([]);
+    setTodosLosAlumnos(false);
+    setMotivoSolicitud('');
+  };
+
+  const cerrarModalSolicitud = () => {
+    if (enviandoSolicitud) return;
+    setSolicitudEvaluacion(null);
+    setAlumnosSeleccionados([]);
+    setTodosLosAlumnos(false);
+    setMotivoSolicitud('');
+  };
+
+  const alternarTodosAlumnos = (marcado) => {
+    setTodosLosAlumnos(marcado);
+    setAlumnosSeleccionados(marcado ? inscripciones.map(inscripcion => inscripcion.idInscripcion) : []);
+  };
+
+  const alternarAlumnoSeleccionado = (idInscripcion) => {
+    setTodosLosAlumnos(false);
+    setAlumnosSeleccionados(anterior => anterior.includes(idInscripcion)
+      ? anterior.filter(id => id !== idInscripcion)
+      : [...anterior, idInscripcion]);
+  };
+
+  const enviarSolicitudModificacion = async () => {
+    if (!solicitudEvaluacion || enviandoSolicitud) return;
+    if (!alumnosSeleccionados.length) return toast.error('Selecciona al menos un alumno.');
+    if (motivoSolicitud.trim().length < MIN_CARACTERES) {
+      return toast.error(`El justificante debe tener al menos ${MIN_CARACTERES} caracteres.`);
+    }
+
+    const tipo = solicitudEvaluacion.tipoEvaluacion || (Number(solicitudEvaluacion.idTipoEvaluacion) === 1 ? 'LABORATORIO' : 'PARCIAL');
+    const cuerpo = {
+      idGrupo: grupoSeleccionado,
+      idTipoEvaluacion: solicitudEvaluacion.idTipoEvaluacion ?? null,
+      tipoEvaluacion: String(tipo).toUpperCase(),
+      numeroEvaluacion: solicitudEvaluacion.numeroEvaluacion,
+      idsInscripcion: alumnosSeleccionados,
+      todosLosAlumnos,
+      motivo: motivoSolicitud.trim(),
+    };
+
+    setEnviandoSolicitud(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/docente/notas/solicitudes-modificacion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(cuerpo)
+      });
+      const texto = await response.text();
+      const data = texto ? JSON.parse(texto) : {};
+      if (!response.ok || data.exito === false) throw new Error(data.mensaje || data.message || `Error ${response.status}`);
+      toast.success('Solicitud enviada', { description: 'El registro académico revisará la modificación.' });
+      cerrarModalSolicitud();
+      await cargarDatosGrupo();
+    } catch (error) {
+      toast.error('No se pudo enviar la solicitud', { description: error.message });
+    } finally {
+      setEnviandoSolicitud(false);
+    }
+  };
+
   const periodosUnicos = [...new Set(evaluaciones.map(ev => ev.periodo).filter(p => p !== null && p !== undefined))].sort();
   const inscripcionesFiltradas = inscripciones.filter(inscripcion => {
     const termino = terminoBusqueda.toLowerCase();
@@ -622,6 +734,8 @@ const IngresoNotas = () => {
   });
 
   const hayEvaluacionesActivas = evaluaciones.some(ev => getEstadoEvaluacion(ev).estado === 'activo');
+  const evaluacionesCerradasSolicitables = evaluaciones.filter(ev => ev.vencida === true && ev.puedeSolicitarModificacion === true);
+  const hayCalificacionesAutorizadas = Object.values(calificaciones).some(calif => estaHabilitadaPorSolicitud(calif));
 
   if (cargando && grupos.length === 0) return (
     <div className="flex flex-col items-center justify-center pt-20">
@@ -716,6 +830,27 @@ const IngresoNotas = () => {
 
             <input ref={inputArchivoRef} type="file" accept=".xlsx,.xls" onChange={handleArchivoSeleccionado} className="hidden" />
 
+            {evaluacionesCerradasSolicitables.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-amber-900">Evaluaciones cerradas con plazo de solicitud abierto</p>
+                  <p className="text-xs text-amber-800 mt-0.5">Puedes pedir autorización para modificar notas dentro de los 7 días posteriores al cierre.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {evaluacionesCerradasSolicitables.map(evalItem => (
+                    <button
+                      key={evalItem.idEvaluacion}
+                      type="button"
+                      onClick={() => abrirModalSolicitud(evalItem)}
+                      className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold shadow-sm hover:bg-gray-800 transition-colors"
+                    >
+                      Solicitar modificación · {evalItem.tipoEvaluacion === 'LABORATORIO' ? 'LAB' : evalItem.tipoEvaluacion} {evalItem.numeroEvaluacion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -753,6 +888,15 @@ const IngresoNotas = () => {
                               }`}>
                                 {estado.mensaje}
                               </div>
+                              {evalItem.vencida === true && evalItem.puedeSolicitarModificacion === true && (
+                                <button
+                                  type="button"
+                                  onClick={() => abrirModalSolicitud(evalItem)}
+                                  className="mt-2 px-2 py-1 rounded-full bg-gray-900 text-white text-[9px] font-bold hover:bg-gray-800 transition-colors"
+                                >
+                                  Solicitar modificación
+                                </button>
+                              )}
                             </th>
                           );
                         });
@@ -775,23 +919,27 @@ const IngresoNotas = () => {
                           {periodosUnicos.map(periodo => {
                             const evaluacionesPeriodo = getEvaluacionesPorPeriodo(periodo);
                             return evaluacionesPeriodo.map((evalItem, idx) => {
-                              const estado = getEstadoEvaluacion(evalItem);
                               const key = `${inscripcion.idInscripcion}-${evalItem.idEvaluacion}`;
                               const calif = calificaciones[key];
                               
-                              const estaPublicada = calif?.estadoCalificacion === 'PUBLICADA';
-                              const estaBloqueado = guardando || publicando || cargandoArchivo || !estado.puedeEditar || !modoEdicionGlobal || estaPublicada;
+                              const autorizada = estaHabilitadaPorSolicitud(calif);
+                              const pendiente = tieneSolicitudPendiente(calif);
+                              const estaPublicada = calif?.estadoCalificacion === 'PUBLICADA' && !autorizada;
+                              const estaBloqueado = guardando || publicando || cargandoArchivo || !puedeEditarCalificacion(evalItem, calif) || (!modoEdicionGlobal && !autorizada) || estaPublicada;
                               const tieneNota = calif?.nota !== null && calif?.nota !== undefined && calif?.nota !== '';
                               const esBorrador = tieneNota && !estaPublicada;
 
                               let colorClass;
-                              if (estaPublicada) colorClass = 'bg-green-50 text-green-700';
+                              if (autorizada) colorClass = 'bg-amber-50 text-amber-800';
+                              else if (estaPublicada) colorClass = 'bg-green-50 text-green-700';
                               else if (esBorrador) colorClass = 'bg-orange-50 text-orange-700';
                               else colorClass = estaBloqueado ? 'bg-gray-50 text-gray-400' : 'bg-white text-gray-900';
 
                               let borderClass;
                               if (!estaBloqueado) {
-                                borderClass = 'border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-text';
+                                borderClass = autorizada
+                                  ? 'border-amber-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 shadow-sm cursor-text'
+                                  : 'border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-text';
                               } else {
                                 if (estaPublicada) borderClass = 'border-green-200 cursor-default';
                                 else if (esBorrador) borderClass = 'border-orange-200 cursor-default';
@@ -805,9 +953,26 @@ const IngresoNotas = () => {
                                     value={calif?.nota ?? ''}
                                     onChange={(e) => handleNotaChange(inscripcion.idInscripcion, evalItem.idEvaluacion, e.target.value)}
                                     disabled={estaBloqueado}
-                                    title={estaPublicada ? 'Calificación oficial. Solicita permisos para modificar.' : (estaBloqueado ? 'Haz clic en Habilitar Edición abajo' : 'Editando nota')}
+                                    title={autorizada ? `Habilitada por solicitud hasta ${formatearFechaHora(calif.habilitadaPorSolicitudHasta)}` : (estaPublicada ? 'Calificación oficial. Solicita permisos para modificar.' : (estaBloqueado ? 'Haz clic en Habilitar Edición abajo' : 'Editando nota'))}
                                     className={`w-16 text-center rounded-lg px-2 py-1.5 text-sm font-bold transition-all outline-none border ${colorClass} ${borderClass}`}
                                   />
+                                  {(autorizada || pendiente) && (
+                                    <div className="mt-2 flex flex-col items-center gap-1">
+                                      {autorizada && (
+                                        <span
+                                          title={`Habilitada por solicitud hasta ${formatearFechaHora(calif.habilitadaPorSolicitudHasta)}`}
+                                          className="max-w-[7.5rem] truncate rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-800"
+                                        >
+                                          Habilitada por solicitud hasta {formatearFechaHora(calif.habilitadaPorSolicitudHasta)}
+                                        </span>
+                                      )}
+                                      {pendiente && (
+                                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                                          Solicitud pendiente de revisión
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </td>
                               );
                             });
@@ -851,7 +1016,7 @@ const IngresoNotas = () => {
               <button
                 type="button"
                 onClick={guardarCalificaciones}
-                disabled={guardando || publicando || cargandoArchivo || !modoEdicionGlobal}
+                disabled={guardando || publicando || cargandoArchivo || (!modoEdicionGlobal && !hayCalificacionesAutorizadas)}
                 className="px-6 py-3 bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm w-full sm:w-auto"
               >
                 {guardando ? 'Guardando...' : 'Guardar Borrador'}
@@ -860,7 +1025,7 @@ const IngresoNotas = () => {
               <button
                 type="button"
                 onClick={publicarCalificacionesActivas}
-                disabled={publicando || guardando || cargandoArchivo || !hayEvaluacionesActivas}
+                disabled={publicando || guardando || cargandoArchivo || (!hayEvaluacionesActivas && !hayCalificacionesAutorizadas)}
                 className="px-6 py-3 bg-white text-gray-900 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm w-full sm:w-auto"
               >
                 {publicando ? 'Publicando...' : 'Publicar Activas'}
@@ -1024,6 +1189,118 @@ const IngresoNotas = () => {
                     Cargar Notas
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {solicitudEvaluacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Solicitar modificación de nota</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Evaluación: <span className="font-semibold text-gray-700">
+                    {solicitudEvaluacion.tipoEvaluacion === 'LABORATORIO' ? 'LAB' : solicitudEvaluacion.tipoEvaluacion} {solicitudEvaluacion.numeroEvaluacion}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarModalSolicitud}
+                disabled={enviandoSolicitud}
+                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                aria-label="Cerrar"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto px-6 py-5">
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={todosLosAlumnos}
+                  disabled={enviandoSolicitud}
+                  onChange={(e) => alternarTodosAlumnos(e.target.checked)}
+                  className="h-4 w-4 accent-gray-900"
+                />
+                <span className="text-sm font-bold text-gray-900">Seleccionar todos los alumnos del grupo</span>
+              </label>
+
+              <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="w-12 px-3 py-3" />
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Carnet</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Estudiante</th>
+                      <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-gray-500">Nota actual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {inscripciones.map(inscripcion => {
+                      const idInscripcion = inscripcion.idInscripcion;
+                      const notaActual = calificaciones[`${idInscripcion}-${solicitudEvaluacion.idEvaluacion}`]?.nota;
+                      return (
+                        <tr key={idInscripcion} className="hover:bg-gray-50/50">
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={todosLosAlumnos || alumnosSeleccionados.includes(idInscripcion)}
+                              disabled={todosLosAlumnos || enviandoSolicitud}
+                              onChange={() => alternarAlumnoSeleccionado(idInscripcion)}
+                              className="h-4 w-4 accent-gray-900"
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{inscripcion.carnet}</td>
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {inscripcion.nombresEstudiante} {inscripcion.apellidosEstudiante}
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-gray-900">
+                            {notaActual === null || notaActual === undefined || notaActual === '' ? 'Sin nota' : notaActual}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <label className="block mt-5">
+                <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Justificante *</span>
+                <textarea
+                  rows={4}
+                  maxLength={MAX_CARACTERES}
+                  value={motivoSolicitud}
+                  onChange={(e) => setMotivoSolicitud(e.target.value)}
+                  placeholder="Describe detalladamente por qué necesitas modificar estas notas..."
+                  className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10"
+                />
+                <span className="mt-2 block text-right text-[11px] font-normal normal-case tracking-normal text-gray-400">
+                  {motivoSolicitud.trim().length}/{MAX_CARACTERES} caracteres (mínimo {MIN_CARACTERES})
+                </span>
+              </label>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={cerrarModalSolicitud}
+                disabled={enviandoSolicitud}
+                className="px-5 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={enviarSolicitudModificacion}
+                disabled={enviandoSolicitud || alumnosSeleccionados.length === 0 || motivoSolicitud.trim().length < MIN_CARACTERES}
+                className="px-5 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors text-sm font-medium shadow-sm"
+              >
+                {enviandoSolicitud ? 'Enviando...' : 'Enviar solicitud'}
               </button>
             </div>
           </div>

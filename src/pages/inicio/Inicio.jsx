@@ -5,7 +5,7 @@ import InicioAdministrador from './InicioAdministrador';
 import InicioFinanzas from './InicioFinanzas';
 import InicioDocente from './InicioDocente';
 import InicioEmpleado from './InicioEmpleado';
-import InicioEstudiante from './InicioEstudiante';
+import DashboardEstudiante from '../estudiantes/DashboardEstudiante';
 
 export default function Inicio() {
   const { roles, nombreCompleto } = useSesion();
@@ -16,7 +16,7 @@ export default function Inicio() {
     if (roles.includes('FINANZAS')) return <InicioFinanzas />;
     if (roles.includes('DOCENTE')) return <InicioDocente />;
     if (roles.includes('EMPLEADO') || roles.includes('REGISTRO_ACADEMICO')) return <InicioEmpleado />;
-    if (roles.includes('ESTUDIANTE')) return <InicioEstudiante />;
+    if (roles.includes('ESTUDIANTE')) return <DashboardEstudiante />;
     
     return (
       <div className="bg-white p-6 rounded-2xl border border-gray-100 text-center text-gray-500 mt-6 shadow-sm">

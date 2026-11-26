@@ -448,6 +448,27 @@ export const menuMaestro = [
       </svg>
     ),
   },
+  {
+    name: 'Evaluaciones y solicitudes',
+    path: '/dashboard/calendario-evaluaciones',
+    rolesPermitidos: ['ADMINISTRADOR', 'REGISTRO_ACADEMICO'],
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+        className="w-5 h-5"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6.75 3v2.25M17.25 3v2.25M3 8.25h18M4.5 5.25h15A1.5 1.5 0 0 1 21 6.75v12a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.75v-12a1.5 1.5 0 0 1 1.5-1.5Zm8.25 7.5 1.5 1.5 3-3.75"
+        />
+      </svg>
+    ),
+  },
 
   // FINANZAS Y COLECTURÍA
   {
