@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { puedeAdministrarDirectorio } from "../../config/permisos";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -336,6 +338,8 @@ function Stat({ icon: Icon, title, value, detail, active, onClick }) {
 }
 
 export default function DirectorioEmpleados() {
+  const sesion = useSesion();
+  const puedeAdministrar = puedeAdministrarDirectorio(sesion, "directorio-empleados");
   const navigate = useNavigate();
   const [empleados, setEmpleados] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -579,7 +583,7 @@ export default function DirectorioEmpleados() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        {puedeAdministrar && (<button
                           type="button"
                           disabled={actual !== "ACTIVO"}
                           onClick={() => setModal({
@@ -591,9 +595,9 @@ export default function DirectorioEmpleados() {
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <KeyRound size={17} aria-hidden="true" />
-                        </button>
+                        </button>)}
 
-                        {["ACTIVO", "BLOQUEADO"].includes(actual) && (
+                        {puedeAdministrar && ["ACTIVO", "BLOQUEADO"].includes(actual) && (
                           <button
                             type="button"
                             onClick={() => setModal({

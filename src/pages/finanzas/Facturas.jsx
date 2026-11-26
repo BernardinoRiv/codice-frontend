@@ -23,7 +23,7 @@ function Facturas() {
   const [fechaHasta, setFechaHasta] = useState(hoy);
   const [textoFiltro, setTextoFiltro] = useState('');
   const [rangoRapido, setRangoRapido] = useState('hoy');
-  const [errorRango, setErrorRango] = useState('');
+  const [errorRango, setErrorRango] = useState(null);
   const solicitudActual = useRef(0);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ function Facturas() {
   }, []);
 
   const cargarFacturasRango = async (desde = fechaDesde, hasta = fechaHasta) => {
-    setErrorRango('');
+    setErrorRango(null);
     if (!desde || !hasta) {
       setErrorRango('Selecciona las dos fechas del rango.');
       return;
@@ -41,38 +41,25 @@ function Facturas() {
       return;
     }
 
-    const dias = [];
-    const actual = new Date(`${desde}T00:00:00Z`);
-    const fin = new Date(`${hasta}T00:00:00Z`);
-    while (actual <= fin) {
-      dias.push(actual.toISOString().slice(0, 10));
-      actual.setUTCDate(actual.getUTCDate() + 1);
-    }
-    if (dias.length > 31) {
-      setErrorRango('El rango máximo es de 31 días. Ajusta las fechas o elige una opción rápida.');
-      return;
-    }
-
     const idSolicitud = ++solicitudActual.current;
     setCargando(true);
     try {
       const token = localStorage.getItem('token');
-      const resultados = [];
-      for (const fecha of dias) {
-        const query = new URLSearchParams({ fecha });
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/historial?${query}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('No se pudo cargar el historial de facturas.');
-        const data = await response.json();
-        if (Array.isArray(data)) resultados.push(...data);
-        else throw new Error('La respuesta del historial no tiene el formato esperado.');
-        if (idSolicitud !== solicitudActual.current) return;
+      const query = new URLSearchParams({ desde, hasta });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/historial/rango?${query}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.mensaje || 'No se pudo cargar el historial de facturas.');
       }
-      setPagos(resultados);
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error('La respuesta del historial no tiene el formato esperado.');
+      if (idSolicitud === solicitudActual.current) setPagos(data);
     } catch (error) {
       if (idSolicitud === solicitudActual.current) {
-        toast.error(error.message || 'Error de conexión');
+        setPagos([]);
+        setErrorRango(error.message || 'Error de conexión');
       }
     } finally {
       if (idSolicitud === solicitudActual.current) setCargando(false);
@@ -187,7 +174,7 @@ function Facturas() {
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         
         <form onSubmit={(event) => { event.preventDefault(); setRangoRapido('personalizado'); cargarFacturasRango(); }}
-          className="mb-6 grid gap-4 border-b border-gray-100 pb-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          noValidate className="mb-6 grid gap-4 border-b border-gray-100 pb-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <fieldset className="md:col-span-3">
             <legend className="mb-2 ml-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Rangos rápidos</legend>
             <div className="flex flex-wrap gap-2">
@@ -203,22 +190,20 @@ function Facturas() {
           <div>
             <label htmlFor="facturas-desde" className="mb-1.5 ml-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Desde</label>
             <input id="facturas-desde" type="date" value={fechaDesde}
-              min={sumarDias(fechaHasta, -30)} max={fechaHasta > hoy ? hoy : fechaHasta}
               onChange={event => {
-                const desde = event.target.value;
-                setFechaDesde(desde);
+                setFechaDesde(event.target.value);
                 setRangoRapido('personalizado');
-                if (fechaHasta < desde) setFechaHasta(desde);
+                setErrorRango(null);
               }}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
           </div>
           <div>
             <label htmlFor="facturas-hasta" className="mb-1.5 ml-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Hasta</label>
             <input id="facturas-hasta" type="date" value={fechaHasta}
-              min={fechaDesde} max={sumarDias(fechaDesde, 30) > hoy ? hoy : sumarDias(fechaDesde, 30)}
               onChange={event => {
                 setFechaHasta(event.target.value);
                 setRangoRapido('personalizado');
+                setErrorRango(null);
               }}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
           </div>
@@ -242,7 +227,6 @@ function Facturas() {
               <svg className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
           </div>
-          <p className="text-xs text-slate-400 md:col-span-3">Elige una opción rápida o un rango personalizado de hasta 31 días.</p>
           {errorRango && <p role="alert" className="text-sm font-medium text-rose-700 md:col-span-3">{errorRango}</p>}
         </form>
 
@@ -251,7 +235,7 @@ function Facturas() {
           <div className="flex justify-center items-center py-16">
              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
           </div>
-        ) : pagosFiltrados.length === 0 ? (
+        ) : errorRango ? null : pagosFiltrados.length === 0 ? (
           <div className="text-center py-16 text-gray-500 font-medium">
             No se encontraron facturas emitidas para los criterios de búsqueda.
           </div>

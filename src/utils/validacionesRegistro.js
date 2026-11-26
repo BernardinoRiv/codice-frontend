@@ -70,3 +70,33 @@ export function validarNacimientoRegistro(valor, edadMinima = 15, ahora = new Da
   if (valor > limites.max) return `Debe tener al menos ${edadMinima} años para este tipo de documento.`;
   return '';
 }
+
+const FORMATO_NOMBRE_REGISTRO = /^\p{L}[\p{L}\p{M}]*(?:[ ’'-]\p{L}[\p{L}\p{M}]*)*$/u;
+
+export function limpiarNombreRegistro(valor) {
+  return String(valor ?? '').normalize('NFC').toLocaleUpperCase('es')
+    .replace(/[^\p{L}\p{M} ’'-]/gu, '').replace(/ {2,}/g, ' ').slice(0, 100);
+}
+
+export function limpiarDireccionRegistro(valor) {
+  return String(valor ?? '').normalize('NFC')
+    .replace(/[^\p{L}\p{M}\p{N}\s#.,;:'’"()&°ºª/+-]/gu, '').slice(0, 255);
+}
+
+export function limpiarEspecialidadRegistro(valor) {
+  return String(valor ?? '').normalize('NFC')
+    .replace(/[^\p{L}\p{M} .,'’()&/+0-9-]/gu, '').slice(0, 100);
+}
+
+export function validarIdentidadRegistro({ nombres, apellidos, direccion }) {
+  if (!FORMATO_NOMBRE_REGISTRO.test(nombres.trim()) || nombres.trim().length > 100) {
+    return 'Escribe los nombres con letras. Puedes separar las palabras con espacios, guiones o apóstrofos.';
+  }
+  if (!FORMATO_NOMBRE_REGISTRO.test(apellidos.trim()) || apellidos.trim().length > 100) {
+    return 'Escribe los apellidos con letras. Puedes separar las palabras con espacios, guiones o apóstrofos.';
+  }
+  if (!/[\p{L}\p{N}]/u.test(direccion) || direccion.length > 255) {
+    return 'Escribe una dirección válida de hasta 255 caracteres.';
+  }
+  return '';
+}

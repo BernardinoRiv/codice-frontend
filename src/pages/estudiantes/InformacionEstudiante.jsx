@@ -1,3 +1,6 @@
+import useSesion from "../../hooks/useSesion";
+import { puedeAdministrarDirectorio } from "../../config/permisos";
+import { limpiarNombreRegistro, limpiarDireccionRegistro, validarIdentidadRegistro, validarCorreoRegistro } from "../../utils/validacionesRegistro";
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -150,16 +153,44 @@ function Indicador({ titulo, valor }) {
   </div>;
 }
 function Badge({ children, type = "neutral" }) { const cls = type === "success" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : type === "danger" ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-slate-100 text-slate-700 ring-slate-200"; return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${cls}`}>{children}</span>; }
+function filtrarTelefono(valor) {
+  const digitos = valor.replace(/\D/g, "").slice(0, 8);
+  if (!/^[67]/.test(digitos)) return "";
+  return digitos.length <= 4 ? digitos : digitos.slice(0, 4) + "-" + digitos.slice(4);
+}
+
+function errorTelefono(valor) {
+  return !valor.trim() || /^[67]\d{3}-?\d{4}$/.test(valor.trim())
+    ? "" : "Escribe ocho dígitos empezando por 6 o 7, por ejemplo 7123-4567.";
+}
+
 function Input({
   label, value, onChange, type = "text", required = false,
-  placeholder, min, max, disabled = false, mayusculas = false
+  placeholder, min, max, disabled = false, mayusculas = false, validar, maxLength, filtrar
 }) {
+  const error = validar?.(String(value ?? "")) || "";
+  const ayuda = React.useId();
   return <label className="block min-w-0">
     <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
     <input
+      ref={input => { if (input) input.setCustomValidity(error); }}
+      aria-invalid={Boolean(error)}
+      aria-describedby={error ? ayuda : undefined}
+      maxLength={maxLength}
+      inputMode={type === "tel" ? "numeric" : undefined}
       type={type}
       value={value ?? ""}
-      onChange={e => onChange(e.target.value)}
+      onChange={e => {
+        const input = e.currentTarget;
+        const original = input.value;
+        const limpio = filtrar ? filtrar(original) : original;
+        if (limpio !== original) {
+          const posicion = filtrar(original.slice(0, input.selectionStart ?? original.length)).length;
+          input.value = limpio;
+          input.setSelectionRange(posicion, posicion);
+        }
+        onChange(limpio);
+      }}
       onBlur={e => {
         if (mayusculas) {
           onChange(e.target.value.toLocaleUpperCase("es"));
@@ -170,12 +201,15 @@ function Input({
       max={max}
       disabled={disabled}
       placeholder={placeholder}
-      className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100 ${mayusculas ? "uppercase" : ""}`}
+      className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base sm:text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100 ${mayusculas ? "uppercase" : ""}`}
     />
+    {error && <span id={ayuda} className="mt-1 block text-xs text-rose-700">{error}</span>}
   </label>;
 }
 
 export default function InformacionEstudiante() {
+  const sesion = useSesion();
+  const puedeAdministrar = puedeAdministrarDirectorio(sesion, "directorio-estudiantes");
   const { idEstudiante } = useParams();
   const navigate = useNavigate();
   const [estudiante, setEstudiante] = useState(null);
@@ -330,6 +364,8 @@ export default function InformacionEstudiante() {
     setProcesando(true);
     try {
       if(modal === "personal") {
+        const error = validarIdentidadRegistro(formPersonal) || errorTelefono(formPersonal.telefono);
+        if (error) throw new Error(error);
         if(!formPersonal.idDepartamento || !formPersonal.idDistrito) {
           throw new Error("Selecciona el departamento y el distrito de residencia.");
         }
@@ -405,7 +441,8 @@ export default function InformacionEstudiante() {
     <button onClick={() => navigate("/dashboard/directorio-estudiantes")} className="mt-4 text-sm font-semibold text-slate-900 underline">Volver al directorio</button>
   </div>;
   const e = estudiante;
-  const estadoUsuario = normalizar(e.estadoUsuario);
+  const estadoUsuario = normalizar(e.estadoUsuario).trim();
+  const estadoAcademico = normalizar(e.estadoEstudiante).trim();
   const tabs = [{ id: "personal", titulo: "Información personal", icon: UserRound }, { id: "academica", titulo: "Información académica", icon: BookOpen }, { id: "cuenta", titulo: "Cuenta institucional", icon: LockKeyhole }];
 
   return <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -427,8 +464,8 @@ export default function InformacionEstudiante() {
           <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-slate-900">{e.nombres} {e.apellidos}</h1>
           <p className="mt-1 text-sm text-slate-500">Carné: {vacio(e.carnet)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>Estudiante: {vacio(e.estadoEstudiante)}</Badge>
-            <Badge type={estadoUsuario === "activo" ? "success" : estadoUsuario === "bloqueado" ? "danger" : "neutral"}>Usuario: {vacio(e.estadoUsuario)}</Badge>
+            <Badge type={estadoAcademico === "activo" ? "success" : "neutral"}>Estado académico: {vacio(e.estadoEstudiante)}</Badge>
+            <Badge type={estadoUsuario === "activo" ? "success" : estadoUsuario === "bloqueado" ? "danger" : "neutral"}>Estado de cuenta: {vacio(e.estadoUsuario)}</Badge>
           </div>
         </div>
       </div>
@@ -443,8 +480,8 @@ export default function InformacionEstudiante() {
           <h2 className="text-lg font-bold text-slate-900">Datos personales</h2>
           <p className="mt-1 text-sm text-slate-500">Información de identidad y contacto registrada.</p>
         </div>
-        <button onClick={abrirPersonal} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          <Edit3 size={16} /> Editar información</button>
+        {puedeAdministrar && (<button onClick={abrirPersonal} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+          <Edit3 size={16} /> Editar información</button>)}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Campo titulo="Nombres" valor={e.nombres} icon={UserRound} />
@@ -461,14 +498,14 @@ export default function InformacionEstudiante() {
           <Campo titulo="Dirección" valor={e.direccion} icon={MapPin} />
         </div>
       </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      {puedeAdministrar && (<div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
         <div>
           <p className="text-sm font-semibold text-amber-900">Documento de identidad</p>
           <p className="mt-1 text-xs text-amber-800">La modificación requiere justificación y se registra en auditoría.</p>
         </div>
         <button onClick={abrirDocumento} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">
           <FileBadge size={15} /> Cambiar documento</button>
-      </div>
+      </div>)}
     </div>}
 
     {seccion === "academica" && <div className="space-y-4">
@@ -525,7 +562,7 @@ export default function InformacionEstudiante() {
         <Campo titulo="Estado del usuario" valor={e.estadoUsuario} icon={CheckCircle2} />
         <Campo titulo="Identificador de usuario" valor={e.idUsuario} icon={LockKeyhole} />
       </div>
-      <div className="mt-6 border-t border-slate-100 pt-5">
+      {puedeAdministrar && (<div className="mt-6 border-t border-slate-100 pt-5">
         <h3 className="text-sm font-semibold text-slate-800">Acciones administrativas</h3>
         <p className="mt-1 text-xs text-slate-500">Estas operaciones requieren permisos de administrador.</p>
         <div className="mt-4 flex flex-wrap gap-3">
@@ -533,10 +570,10 @@ export default function InformacionEstudiante() {
             <LockKeyhole size={16} /> Restablecer contraseña</button>{estadoUsuario === "activo" && <button onClick={() => setModal("bloquear")} className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">
               <ShieldAlert size={16} /> Bloquear cuenta</button>}{estadoUsuario === "bloqueado" && <button onClick={() => setModal("desbloquear")} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
                 <CheckCircle2 size={16} /> Desbloquear cuenta</button>}</div>
-      </div>
+      </div>)}
     </div>}
 
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={ev => { if(ev.target === ev.currentTarget) cerrar(); }}>
+    {puedeAdministrar && modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={ev => { if(ev.target === ev.currentTarget) cerrar(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="modal-titulo" className="my-auto w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
@@ -549,8 +586,8 @@ export default function InformacionEstudiante() {
         </div>
         <form onSubmit={ejecutar} className="space-y-5">{modal === "personal" && <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Nombres" mayusculas required value={formPersonal.nombres} onChange={v => setFormPersonal(p => ({ ...p, nombres: v }))} />
-            <Input label="Apellidos" mayusculas required value={formPersonal.apellidos} onChange={v => setFormPersonal(p => ({ ...p, apellidos: v }))} />
+            <Input label="Nombres" maxLength={100} filtrar={limpiarNombreRegistro} mayusculas required value={formPersonal.nombres} onChange={v => setFormPersonal(p => ({ ...p, nombres: v }))} />
+            <Input label="Apellidos" maxLength={100} filtrar={limpiarNombreRegistro} mayusculas required value={formPersonal.apellidos} onChange={v => setFormPersonal(p => ({ ...p, apellidos: v }))} />
             <Input
               label="Fecha de nacimiento"
               required
@@ -579,10 +616,10 @@ export default function InformacionEstudiante() {
                 <option value="F">Femenino</option>
               </select>
             </label>
-            <Input label="Teléfono" placeholder="7123-4567" value={formPersonal.telefono} onChange={v => setFormPersonal(p => ({ ...p, telefono: v }))} />
-            <Input label="Correo personal" type="email" value={formPersonal.correoPersonal} onChange={v => setFormPersonal(p => ({ ...p, correoPersonal: v }))} />
+            <Input label="Teléfono" type="tel" filtrar={filtrarTelefono} validar={errorTelefono} placeholder="7123-4567" value={formPersonal.telefono} onChange={v => setFormPersonal(p => ({ ...p, telefono: v }))} />
+            <Input label="Correo personal" type="email" maxLength={150} validar={valor => valor.trim() ? validarCorreoRegistro(valor.trim()) : ""} value={formPersonal.correoPersonal} onChange={v => setFormPersonal(p => ({ ...p, correoPersonal: v }))} />
             <div className="sm:col-span-2">
-              <Input label="Dirección" mayusculas required value={formPersonal.direccion} onChange={v => setFormPersonal(p => ({ ...p, direccion: v }))} />
+              <Input label="Dirección" maxLength={255} filtrar={limpiarDireccionRegistro} mayusculas required value={formPersonal.direccion} onChange={v => setFormPersonal(p => ({ ...p, direccion: v }))} />
             </div>
             <label className="block min-w-0">
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">
@@ -642,7 +679,7 @@ export default function InformacionEstudiante() {
           </div>
         </>}{modal === "documento" && <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Documento actual" required value={formDocumento.documentoActual} onChange={v => setFormDocumento(p => ({ ...p, documentoActual: v }))} />
+            <Input label="Documento actual" disabled value={formDocumento.documentoActual} />
             <label className="block min-w-0">
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de documento *</span>
               <select required disabled={cargandoTipos || !!errorTipos} value={formDocumento.idTipoDocumento} onChange={ev => setFormDocumento(p => ({ ...p, idTipoDocumento: ev.target.value, numeroDocumento: "" }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100">

@@ -29,3 +29,10 @@ export function puedeVerRuta(sesion, ruta) {
 
   return sesion.roles.some(rol => roles.includes(rol));
 }
+
+export function puedeAdministrarDirectorio(sesion, directorio) {
+  return sesion.roles.includes(ROLES.ADMINISTRADOR) || (
+    sesion.roles.includes(ROLES.EMPLEADO) &&
+    puedeVerRuta(sesion, `/dashboard/${directorio}`)
+  );
+}

@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { puedeAdministrarDirectorio } from "../../config/permisos";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -25,7 +27,7 @@ const normalizar = (valor) => String(valor ?? "")
   .toLowerCase();
 const estado = (e) => !e.idUsuario
   ? "SIN USUARIO"
-  : String(e.estadoUsuario || "SIN ESTADO").toUpperCase();
+  : String(e.estadoUsuario || "SIN ESTADO").trim().toUpperCase();
 
 async function apiRequest(ruta, options = {}) {
   const response = await fetch(`${API}${ruta}`, {
@@ -89,6 +91,8 @@ function Stat({ icon: Icon, title, value, detail, active, onClick }) {
 }
 
 export default function DirectorioEstudiantes() {
+  const sesion = useSesion();
+  const puedeAdministrar = puedeAdministrarDirectorio(sesion, "directorio-estudiantes");
   const navigate = useNavigate();
   const [estudiantes, setEstudiantes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -278,7 +282,7 @@ export default function DirectorioEstudiantes() {
               onChange={e => setFiltro(e.target.value)}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
-              <option value="TODOS">Todos los estados</option>
+              <option value="TODOS">Todos los estados de cuenta</option>
               <option value="ACTIVO">Activos</option>
               <option value="INACTIVO">Inactivos</option>
               <option value="BLOQUEADO">Bloqueados</option>
@@ -288,13 +292,14 @@ export default function DirectorioEstudiantes() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
+          <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-4">Estudiante</th>
                 <th className="px-5 py-4">Carrera</th>
                 <th className="px-5 py-4">Correo institucional</th>
-                <th className="px-5 py-4">Estado</th>
+                <th scope="col" className="px-5 py-4">Estado académico</th>
+                <th scope="col" className="px-5 py-4">Estado de cuenta</th>
                 <th className="px-5 py-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -322,11 +327,14 @@ export default function DirectorioEstudiantes() {
                       {e.correoInstitucional || "No registrado"}
                     </td>
                     <td className="px-5 py-4">
+                      <EstadoBadge value={String(e.estadoEstudiante ?? "").trim().toUpperCase() || "SIN ESTADO"} />
+                    </td>
+                    <td className="px-5 py-4">
                       <EstadoBadge value={actual} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        {puedeAdministrar && (<button
                           type="button"
                           disabled={!e.idUsuario}
                           onClick={() => setModal({
@@ -338,9 +346,9 @@ export default function DirectorioEstudiantes() {
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <KeyRound size={17} aria-hidden="true" />
-                        </button>
+                        </button>)}
 
-                        {["ACTIVO", "BLOQUEADO"].includes(actual) && (
+                        {puedeAdministrar && ["ACTIVO", "BLOQUEADO"].includes(actual) && (
                           <button
                             type="button"
                             onClick={() => setModal({
