@@ -1042,7 +1042,9 @@ export default function AdmisionOnline() {
     if (!iniciarOperacion()) return;
 
     try {
-      const respuesta = await admisionService.consultarPlanFinanciero();
+      const respuesta = await admisionService.consultarPlanFinanciero(
+        Number(carreraSeleccionada),
+      );
 
       const campos = [
         "idCiclo",

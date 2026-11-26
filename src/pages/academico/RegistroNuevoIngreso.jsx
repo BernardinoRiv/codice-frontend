@@ -1,4 +1,7 @@
-import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
+
+import useSesion from "../../hooks/useSesion";
+import { ROLES } from "../../utils/sesion";
+import { limpiarNombreRegistro, limpiarDireccionRegistro, validarIdentidadRegistro, normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -43,7 +46,7 @@ const formatearTelefono = (valor = '') => {
   return digitos;
 };
 
-const formatearMayusculas = (t = '') => String(t || '').toUpperCase().replace(/[0-9<>]/g, '');
+const formatearMayusculas = limpiarNombreRegistro;
 
 const esDuiValido = (dui) => {
   const digitos = extraerDigitos(dui);
@@ -72,19 +75,6 @@ const esTelefonoValido = (telefono) => {
 const esCorreoValido = correo => validarCorreoRegistro(correo) === '';
 
 const calcularFechaMaxima = edadMinima => limitesFechaNacimiento(edadMinima).max;
-
-const obtenerSedeDesdeToken = () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return '';
-    const payloadBase64 = token.split('.')[1];
-    const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-    const decodedJson = JSON.parse(atob(base64));
-    return decodedJson.idSede || decodedJson.sedeId || decodedJson.id_sede || '';
-  } catch (e) {
-    return '';
-  }
-};
 
 const numeroArancel = (valor) => {
   const numero = Number(valor);
@@ -205,9 +195,9 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
             if (!open) setSearch('');
           }
         }}
-        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
+        className="w-full min-h-[50px] py-2.5 bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
       >
-        <span className={`truncate ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
+        <span className={`min-w-0 whitespace-normal break-words leading-snug ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
           {seleccionado ? (seleccionado.nombre || seleccionado.nombreCarrera || seleccionado.nombreSede) : placeholder}
         </span>
         <svg className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,6 +274,10 @@ function FilaResumen({ etiqueta, valor, tipo = 'normal', conBorde = false }) {
 }
 
 export default function RegistroNuevoIngreso() {
+  const { roles, payload } = useSesion();
+  const sedeRestringida = roles.includes(ROLES.EMPLEADO);
+  const sedeAsignada = String(payload?.idSede ?? '');
+
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
   const [maxFechaNacimiento, setMaxFechaNacimiento] = useState(calcularFechaMaxima(18));
@@ -310,9 +304,38 @@ export default function RegistroNuevoIngreso() {
   const [formData, setFormData] = useState({
     idPersona: null, idTipoDocumento: '', numeroDocumento: '', nombres: '', apellidos: '',
     fechaNacimiento: '', sexo: '', telefono: '', correoPersonal: '', idDepartamento: '', idDistrito: '', direccion: '',
-    idSede: obtenerSedeDesdeToken(),
+    idSede: sedeAsignada,
     idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
   });
+
+  const idSedeRegistro = sedeRestringida ? sedeAsignada : formData.idSede;
+  const [carrerasSede, setCarrerasSede] = useState([]);
+
+  useEffect(() => {
+    if (!idSedeRegistro) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ idSede: idSedeRegistro });
+
+    fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/carreras-por-sede?${params}`, {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }).then(async response => {
+      if (!response.ok) throw new Error('No se pudieron cargar las carreras de la sede.');
+      const carreras = await response.json();
+      if (!controller.signal.aborted) setCarrerasSede(Array.isArray(carreras) ? carreras : []);
+    }).catch(error => {
+      if (!controller.signal.aborted) toast.error(error.message);
+    });
+
+    return () => controller.abort();
+  }, [idSedeRegistro]);
+
+  const cambiarSede = idSede => {
+    setCarrerasSede([]);
+    setOfertaAcademica([]);
+    setFormData(prev => ({ ...prev, idSede, idCarreraSede: '', idPensum: '', idGruposSeleccionados: [] }));
+  };
+
 
   useEffect(() => () => {
     if (urlComprobanteLocalRef.current) URL.revokeObjectURL(urlComprobanteLocalRef.current);
@@ -348,7 +371,7 @@ export default function RegistroNuevoIngreso() {
     const fetchCatalogos = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -458,33 +481,43 @@ export default function RegistroNuevoIngreso() {
       setFormData(p => ({ ...p, idPensum: '' }));
       return;
     }
+    const controller = new AbortController();
     const fetchPensum = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${formData.idCarreraSede}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/pensum-vigente?idCarreraSede=${formData.idCarreraSede}`, { signal: controller.signal, headers: { 'Authorization': `Bearer ${token}` } });
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const data = await res.json();
+          if (controller.signal.aborted) return;
           setPensumVigente(data);
-          setFormData(p => ({ ...p, idPensum: data.idPensum })); 
+          setFormData(p => ({ ...p, idPensum: data.idPensum }));
         } else {
           toast.error("Atención", { description: "No hay un plan de estudios activo configurado para esta carrera." });
           setPensumVigente(null);
           setFormData(p => ({ ...p, idPensum: '' }));
         }
-      } catch (error) { toast.error("Error al consultar el pensum."); }
+      } catch { if (!controller.signal.aborted) toast.error("Error al consultar el pensum."); }
     };
     fetchPensum();
+    return () => controller.abort();
   }, [formData.idCarreraSede]);
 
   useEffect(() => {
-    if (!formData.idPensum || !formData.idSede) { setOfertaAcademica([]); return; }
+    if (!formData.idPensum || !idSedeRegistro) {
+      setOfertaAcademica([]);
+      setCargandoOferta(false);
+      return;
+    }
+    const controller = new AbortController();
     const fetchOferta = async () => {
       setCargandoOferta(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/nuevo-ingreso?idPensum=${formData.idPensum}&idSede=${formData.idSede}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/oferta-academica/nuevo-ingreso?idPensum=${formData.idPensum}&idSede=${idSedeRegistro}`, { signal: controller.signal, headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
+          if (controller.signal.aborted) return;
           
           const dataOrdenada = data.map(materia => {
             return {
@@ -511,10 +544,15 @@ export default function RegistroNuevoIngreso() {
           setOfertaAcademica(dataOrdenada);
           setFormData(prev => ({ ...prev, idGruposSeleccionados: [] }));
         }
-      } catch (error) { toast.error('Error al cargar horarios.'); } finally { setCargandoOferta(false); }
+      } catch {
+        if (!controller.signal.aborted) toast.error('Error al cargar horarios.');
+      } finally {
+        if (!controller.signal.aborted) setCargandoOferta(false);
+      }
     };
     fetchOferta();
-  }, [formData.idPensum, formData.idSede]);
+    return () => controller.abort();
+  }, [formData.idPensum, idSedeRegistro]);
 
   const handleReset = () => {
     toast.dismiss();
@@ -528,7 +566,7 @@ export default function RegistroNuevoIngreso() {
     setTipoBeca('1');
     setPromocionSeleccionada('');
     setFormData(prev => ({
-      idPersona: null, idTipoDocumento: prev.idTipoDocumento, numeroDocumento: '', nombres: '', apellidos: '',
+      idPersona: null, idSede: prev.idSede, idTipoDocumento: prev.idTipoDocumento, numeroDocumento: '', nombres: '', apellidos: '',
       fechaNacimiento: '', sexo: '', telefono: '', correoPersonal: '', idDepartamento: '', idDistrito: '', direccion: '',
       idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
     }));
@@ -647,6 +685,11 @@ export default function RegistroNuevoIngreso() {
   const errorCorreo = validarCorreoRegistro(formData.correoPersonal);
   const errorNacimiento = validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
   const validarContactoNacimiento = () => {
+    const errorIdentidad = validarIdentidadRegistro(formData);
+    if (errorIdentidad) {
+      toast.warning('Revisa los datos personales', { description: errorIdentidad });
+      return false;
+    }
     const mensaje = validarCorreoRegistro(formData.correoPersonal) || validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
     if (mensaje) { toast.warning('Revisa los datos personales', { description: mensaje }); return false; }
     return true;
@@ -687,7 +730,7 @@ export default function RegistroNuevoIngreso() {
           ...formData,
           idTipoDocumento: Number(formData.idTipoDocumento),
           idDistrito: Number(formData.idDistrito),
-          idSede: Number(formData.idSede),
+          idSede: Number(idSedeRegistro),
           idCarreraSede: Number(formData.idCarreraSede),
           idPensum: Number(formData.idPensum),
           tipoBeca: idBeneficioFinal
@@ -715,7 +758,7 @@ export default function RegistroNuevoIngreso() {
     }
   };
 
-  const carreraSeleccionada = catalogos.carreras?.find(c => String(c.idCarreraSede ?? c.id) === String(formData.idCarreraSede));
+  const carreraSeleccionada = carrerasSede.find(c => String(c.idCarreraSede ?? c.id) === String(formData.idCarreraSede));
   const nivelSeleccionado = esCarreraPosgrado(carreraSeleccionada) ? 'POSGRADO' : 'PREGRADO';
   const arancelesCiclo = useMemo(() => {
     const esPosgrado = nivelSeleccionado === 'POSGRADO';
@@ -821,7 +864,7 @@ export default function RegistroNuevoIngreso() {
 
   const c1 = [formData.nombres, formData.apellidos, formData.idTipoDocumento, docValido, !errorNacimiento, formData.sexo].filter(Boolean).length;
   const c2 = [esTelefonoValido(formData.telefono), esCorreoValido(formData.correoPersonal), formData.idDepartamento, formData.idDistrito, formData.direccion].filter(Boolean).length;
-  const c3 = [formData.idSede, formData.idCarreraSede, formData.idPensum, formData.idGruposSeleccionados.length > 0].filter(Boolean).length;
+  const c3 = [idSedeRegistro, formData.idCarreraSede, formData.idPensum, formData.idGruposSeleccionados.length > 0].filter(Boolean).length;
 
   const getStatus1 = () => (c1 === 6 && documentoVerificado) ? { state: 'complete' } : (c1 > 0 ? { state: 'active', pct: Math.round((c1 / 6) * 100) } : { state: 'idle' });
   const getStatus2 = () => (c2 === 5 && documentoVerificado) ? { state: 'complete' } : (c2 > 0 ? { state: 'active', pct: Math.round((c2 / 5) * 100) } : { state: 'idle' });
@@ -861,19 +904,23 @@ export default function RegistroNuevoIngreso() {
   const getNombreCompleto = () => (!formData.nombres && !formData.apellidos) ? 'Perfil de aspirante' : `${formData.nombres} ${formData.apellidos}`;
   const getPreviewCodigo = () => formData.nombres ? `ASP-${new Date().getFullYear()}-XXXX` : `ASP-YYYY-XXXX`;
   const getPreviewEmail = () => (!formData.nombres || !formData.apellidos) ? 'usuario@uma.edu.sv' : `${formData.nombres.trim().charAt(0).toLowerCase()}.${formData.apellidos.trim().split(' ')[0].toLowerCase()}@uma.edu.sv`;
-  const getCarreraTexto = () => !formData.idCarreraSede ? '---' : (catalogos.carreras?.find(a => String(a.idCarreraSede) === String(formData.idCarreraSede))?.nombreCarrera || '---');
-  const getSedeTexto = () => !formData.idSede ? '---' : (catalogos.sedes?.find(s => String(s.id) === String(formData.idSede))?.nombre || '---');
+  const getCarreraTexto = () => !formData.idCarreraSede ? '---' : (carrerasSede.find(a => String(a.idCarreraSede) === String(formData.idCarreraSede))?.nombreCarrera || '---');
+  const getSedeTexto = () => !idSedeRegistro ? '---' : (catalogos.sedes?.find(s => String(s.id) === String(idSedeRegistro))?.nombre || payload?.nombreSede || '---');
 
   const inputClass = "w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed placeholder-slate-400";
   const labelClass = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
   const sectionTitleClass = "text-[12px] font-extrabold text-slate-900 uppercase tracking-widest mb-5 pb-2 border-b border-slate-200 flex items-center gap-2";
 
-  const opcionesTipoBeca = [
-    { id: '1', nombre: 'Ninguna (Alumno Regular)' },
-    { id: '2', nombre: 'Franja Becaria (Subsidio Parcial)' },
-    { id: '3', nombre: 'Beca Completa Institucional (100%)' },
+  const catalogoTiposBeca = [
+    { id: '1', nombre: 'Ninguna (Estudiante Regular)' },
+    { id: '2', nombre: 'Franja Becaria' },
+    { id: '3', nombre: 'Beca Completa (100%)' },
     { id: '4', nombre: 'Beca de Terceros (Paga entidad externa)' },
   ];
+  const opcionesTipoBeca = catalogoTiposBeca.filter(opcion => {
+    const nombre = normalizarBusqueda(opcion?.nombre);
+    return !nombre.includes('tercero') && !nombre.includes('externa');
+  });
 
   return (
     <div className="w-full max-w-7xl pb-20 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -933,13 +980,13 @@ export default function RegistroNuevoIngreso() {
           <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Datos biográficos y de contacto {personaExistente && <span className="ml-2 text-[10px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">Bloqueado</span>}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-              <div><label className={labelClass}>Nombres</label><input required type="text" disabled={personaExistente} value={formData.nombres} onChange={e => setFormData(p => ({...p, nombres: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. JUAN CARLOS" /></div>
-              <div><label className={labelClass}>Apellidos</label><input required type="text" disabled={personaExistente} value={formData.apellidos} onChange={e => setFormData(p => ({...p, apellidos: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. PEREZ GARCIA" /></div>
+              <div><label className={labelClass}>Nombres</label><input required type="text" disabled={personaExistente} maxLength={100} value={formData.nombres} onChange={e => setFormData(p => ({...p, nombres: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. JUAN CARLOS" /></div>
+              <div><label className={labelClass}>Apellidos</label><input required type="text" disabled={personaExistente} maxLength={100} value={formData.apellidos} onChange={e => setFormData(p => ({...p, apellidos: formatearMayusculas(e.target.value)}))} className={inputClass} placeholder="Ej. PEREZ GARCIA" /></div>
               <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Fecha nacimiento</label></div><input aria-invalid={Boolean(formData.fechaNacimiento && errorNacimiento)} aria-describedby={formData.fechaNacimiento && errorNacimiento ? "error-nacimiento" : undefined} min={limitesFechaNacimiento().min} required type="date" disabled={personaExistente} max={maxFechaNacimiento} value={formData.fechaNacimiento} onChange={e => setFormData(p => ({...p, fechaNacimiento: e.target.value}))} className={inputClass} />
                     {formData.fechaNacimiento && errorNacimiento && <p id="error-nacimiento" role="alert" className="mt-1.5 text-xs text-red-600">{errorNacimiento}</p>}</div>
               <div><SelectBuscador label="Sexo" value={formData.sexo} onChange={v => setFormData(p => ({...p, sexo: v}))} options={[{id: 'M', nombre: 'Masculino'}, {id: 'F', nombre: 'Femenino'}]} placeholder="-- Seleccione --" disabled={personaExistente} /></div>
               <div><div className="h-5 mb-1.5 ml-1 flex items-center justify-between"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Teléfono</label>{formData.telefono && !['2', '6', '7'].includes(formData.telefono.charAt(0)) && (<span className="text-[10px] font-bold text-red-600">Debe iniciar con 2, 6 o 7</span>)}</div><input required type="tel" maxLength={9} disabled={personaExistente} value={formData.telefono} onChange={e => handleTelefonoChange(e.target.value)} className={inputClass} placeholder="7000-0000" /></div>
-              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label></div><input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={254} required type="email" disabled={personaExistente} value={formData.correoPersonal} onChange={e => setFormData(p => ({...p, correoPersonal: e.target.value.toLowerCase().trim()}))} className={inputClass} placeholder="juan@gmail.com" />
+              <div><div className="h-5 mb-1.5 ml-1 flex items-center"><label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label></div><input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={150} required type="email" disabled={personaExistente} value={formData.correoPersonal} onChange={e => setFormData(p => ({...p, correoPersonal: e.target.value.toLowerCase().trim()}))} className={inputClass} placeholder="juan@gmail.com" />
                     {formData.correoPersonal && errorCorreo && <p id="error-correo" role="alert" className="mt-1.5 text-xs text-red-600">{errorCorreo}</p>}</div>
             </div>
           </div>
@@ -949,15 +996,15 @@ export default function RegistroNuevoIngreso() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
               <SelectBuscador label="Departamento" disabled={personaExistente} value={formData.idDepartamento} onChange={v => setFormData(p => ({...p, idDepartamento: v, idDistrito: ''}))} options={catalogos.departamentos} placeholder="-- Seleccione depto. --" />
               <SelectBuscador label="Distrito" disabled={personaExistente || !formData.idDepartamento} value={formData.idDistrito} onChange={v => setFormData(p => ({...p, idDistrito: v}))} options={distritos} placeholder={distritos.length === 0 ? '-- Elija depto. --' : '-- Seleccione distrito --'} />
-              <div className="md:col-span-2"><label className={labelClass}>Dirección detallada</label><textarea required disabled={personaExistente} value={formData.direccion} onChange={e => setFormData(p => ({...p, direccion: e.target.value.replace(/[<>]/g, '')}))} rows="2" className={`${inputClass} h-auto py-3 resize-none`} placeholder="Colonia, pasaje, casa..." /></div>
+              <div className="md:col-span-2"><label className={labelClass}>Dirección detallada</label><textarea required disabled={personaExistente} maxLength={255} value={formData.direccion} onChange={e => setFormData(p => ({...p, direccion: limpiarDireccionRegistro(e.target.value)}))} rows="2" className={`${inputClass} h-auto py-3 resize-none`} placeholder="Colonia, pasaje, casa..." /></div>
             </div>
           </div>
 
           <div className={`transition-opacity duration-300 ${(!documentoVerificado || personaExistente) ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <h3 className={sectionTitleClass}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Proyección académica</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-              <div className="md:col-span-1"><SelectBuscador label="Sede operativa" disabled={true} value={formData.idSede} onChange={v => setFormData(p => ({...p, idSede: v}))} options={catalogos.sedes} placeholder="-- Sede --" /></div>
-              <div className="md:col-span-1"><SelectBuscador label="Carrera solicitada" disabled={personaExistente} value={formData.idCarreraSede} onChange={v => setFormData(p => ({...p, idCarreraSede: v}))} options={catalogos.carreras} placeholder="-- Seleccione carrera --" searchPlaceholder="Buscar carrera..." /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-5">
+              <div className="md:col-span-1"><SelectBuscador label="Sede operativa" disabled={sedeRestringida} value={idSedeRegistro} onChange={cambiarSede} options={sedeRestringida ? [{ id: sedeAsignada, nombre: payload?.nombreSede || 'Sede asignada' }] : catalogos.sedes} placeholder="-- Sede --" /></div>
+              <div className="md:col-span-1"><SelectBuscador label="Carrera solicitada" disabled={personaExistente || !idSedeRegistro} value={formData.idCarreraSede} onChange={v => setFormData(p => ({...p, idCarreraSede: v, idPensum: '', idGruposSeleccionados: []}))} options={carrerasSede} placeholder="-- Seleccione carrera --" searchPlaceholder="Buscar carrera..." /></div>
               <div className="md:col-span-1"><label className={labelClass}>Pensum vigente</label><div className={`w-full h-[50px] bg-slate-50/50 border border-slate-200 rounded-xl px-4 flex items-center text-base cursor-not-allowed ${pensumVigente ? 'text-slate-900 font-extrabold' : 'text-slate-500 font-medium'}`}>{pensumVigente ? `Plan ${pensumVigente.version}` : '-- Autocompletado --'}</div></div>
             </div>
           </div>
@@ -984,7 +1031,7 @@ export default function RegistroNuevoIngreso() {
                          return (
                            <div key={grupo.idGrupo} onClick={() => !sinCupo && !personaExistente && toggleGrupo(grupo.idGrupo, materia.idMateria)} className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${sinCupo ? 'bg-red-50/50 border-red-100 opacity-60 cursor-not-allowed' : isSelected ? 'bg-emerald-50 border-emerald-500 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}>
                              <div className="flex justify-between items-start mb-2.5"><span className="font-extrabold text-xs text-slate-900">Grupo {grupo.codigoGrupo}</span><span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-md ${sinCupo ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>{sinCupo ? 'LLENO' : `${grupo.cuposDisponibles} cupos`}</span></div>
-                             <p className="text-[11px] font-medium text-slate-600 mb-3 truncate">Catedrático: <span className="font-bold text-slate-800">{grupo.nombreDocente}</span></p>
+                             <p className="text-[11px] font-medium text-slate-600 mb-3 break-words">Catedrático: <span className="font-bold text-slate-800">{grupo.nombreDocente}</span></p>
                              <div className="space-y-1.5">
                                {grupo.horarios.map((h, i) => (
                                  <div key={i} className={`text-[10px] font-bold ${isSelected ? 'bg-emerald-100/50 text-emerald-800' : 'bg-slate-100 text-slate-600'} rounded-md px-2 py-1 flex justify-between`}><span>{h.diaSemana}</span><span>{h.horaInicio} - {h.horaFin} ({h.modalidad})</span></div>
@@ -1076,10 +1123,11 @@ export default function RegistroNuevoIngreso() {
                   {tipoBeca === '3' && (
                     <>
                       <FilaResumen etiqueta="Subtotal sin beca" valor={`$${finanzas.subtotal.toFixed(2)}`} conBorde />
-                      <FilaResumen etiqueta="Descuento Beca 100%" valor={`-$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
-                      <FilaResumen etiqueta="Total a pagar" valor={`$${finanzas.total.toFixed(2)}`} tipo="total" conBorde />
+                      <FilaResumen etiqueta="Total del ciclo cubierto por beca" valor={`$${finanzas.descuento.toFixed(2)}`} tipo="fuerte" />
+                      <FilaResumen etiqueta="Descuento institucional" valor={`$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
+                      <FilaResumen etiqueta="Pago inicial requerido al aspirante" valor={`$${finanzas.pagoInicial.toFixed(2)}`} tipo="total" conBorde />
                       <p className="text-xs text-emerald-800 font-semibold leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                        El estudiante quedará matriculado de inmediato y recibirá su comprobante PDF de beca y credenciales por correo.
+                        La matrícula se activará de inmediato y se enviarán sus credenciales y comprobante al correo personal.
                       </p>
                     </>
                   )}
@@ -1148,8 +1196,8 @@ export default function RegistroNuevoIngreso() {
             <div className="border-t border-slate-100 pt-5 space-y-4">
               <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Correo</span><span className="font-bold text-slate-800">{getPreviewEmail()}</span></div>
               <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Documento</span><span className="font-bold text-slate-800 text-right">{formData.numeroDocumento || '----------'}</span></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Sede operativa</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getSedeTexto()}</span></div>
-              <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Carrera</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getCarreraTexto()}</span></div>
+              <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Sede operativa</span><span className="font-bold text-slate-800 text-right w-1/2 min-w-0 break-words">{getSedeTexto()}</span></div>
+              <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Carrera</span><span className="font-bold text-slate-800 text-right w-1/2 min-w-0 break-words">{getCarreraTexto()}</span></div>
             </div>
 
             <div className="mt-8 pt-5 border-t border-dashed border-slate-200">
@@ -1176,7 +1224,7 @@ export default function RegistroNuevoIngreso() {
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 space-y-3.5 text-xs my-6">
                 <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Aspirante</span><span className="font-extrabold text-slate-900 text-right">{formData.nombres} {formData.apellidos}</span></div>
                 <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Sede operativa</span><span className="font-semibold text-slate-700 text-right">{getSedeTexto()}</span></div>
-                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Carrera elegida</span><span className="font-bold text-slate-800 text-right max-w-[200px] truncate">{getCarreraTexto()}</span></div>
+                <div className="flex justify-between gap-4 border-b border-slate-200/60 pb-2.5"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Carrera elegida</span><span className="font-bold text-slate-800 text-right max-w-[65%] min-w-0 break-words">{getCarreraTexto()}</span></div>
                 <div className="flex justify-between items-center gap-4 pt-0.5"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Materias a cursar</span><span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md font-bold text-[11px]">{formData.idGruposSeleccionados.length} seleccionadas</span></div>
               </div>
 
@@ -1189,7 +1237,7 @@ export default function RegistroNuevoIngreso() {
 
               <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6">
                 {tipoBeca === '3'
-                  ? 'El aspirante quedará matriculado de inmediato. El comprobante de beca y las credenciales se enviarán por correo.'
+                  ? 'La matrícula se activará de inmediato y se enviarán sus credenciales y comprobante al correo personal.'
                   : tipoBeca === '4'
                     ? 'La entidad externa cubrirá el ciclo completo; se reservarán los cupos sin generar deuda para el aspirante.'
                     : 'Se reservarán los cupos en los grupos seleccionados y se generará la deuda en el sistema financiero institucional para ser cancelada en colectaduría.'}

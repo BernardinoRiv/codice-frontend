@@ -1,3 +1,5 @@
+import useSesion from "../../hooks/useSesion";
+import { puedeAdministrarDirectorio } from "../../config/permisos";
 import { createPortal } from "react-dom";
 import React, { useCallback, useEffect, useState, useId, useRef, useLayoutEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -407,6 +409,9 @@ function Input({
 }
 
 export default function InformacionDocente() {
+  const sesion = useSesion();
+  const puedeCambiarAsignacion = sesion.roles.includes("ADMINISTRADOR");
+  const puedeAdministrar = puedeAdministrarDirectorio(sesion, "directorio-docentes");
   const { idDocente } = useParams();
   const navigate = useNavigate();
   const [docente, setDocente] = useState(null);
@@ -708,7 +713,7 @@ export default function InformacionDocente() {
           <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-slate-900">{e.nombres} {e.apellidos}</h1>
           <p className="mt-1 text-sm text-slate-500">Código: {vacio(e.codigoDocente)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>Docente: {vacio(e.estadoDocente)}</Badge>
+            <Badge type={estadoLaboral === "activo" ? "success" : estadoLaboral === "inactivo" ? "danger" : "neutral"}>Docente: {vacio(e.estadoDocente)}</Badge>
             <Badge type={estadoUsuario === "activo" ? "success" : estadoUsuario === "bloqueado" ? "danger" : "neutral"}>Usuario: {vacio(e.estadoUsuario)}</Badge>
           </div>
         </div>
@@ -724,8 +729,8 @@ export default function InformacionDocente() {
           <h2 className="text-lg font-bold text-slate-900">Datos personales</h2>
           <p className="mt-1 text-sm text-slate-500">Información de identidad y contacto registrada.</p>
         </div>
-        <button onClick={abrirPersonal} className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-          <Edit3 size={16} /> Editar información</button>
+        {puedeAdministrar && (<button onClick={abrirPersonal} className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
+          <Edit3 size={16} /> Editar información</button>)}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Campo titulo="Nombres" valor={e.nombres} icon={UserRound} />
@@ -741,22 +746,22 @@ export default function InformacionDocente() {
           <Campo titulo="Dirección" valor={e.direccion} icon={MapPin} />
         </div>
       </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      {puedeAdministrar && (<div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
         <div>
           <p className="text-sm font-semibold text-amber-900">Documento de identidad</p>
           <p className="mt-1 text-xs text-amber-800">La modificación requiere justificación y se registra en auditoría.</p>
         </div>
         <button onClick={abrirDocumento} className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">
           <FileBadge size={15} /> Cambiar documento</button>
-      </div>
+      </div>)}
     </div>}
 
     {seccion === "laboral" && <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div><h2 className="text-lg font-bold text-slate-900">Información laboral</h2>
           <p className="mt-1 text-sm text-slate-500">Asignación, sede y vigencia del docente.</p></div>
-        <button onClick={() => { setFormLaboral({ especialidad: e.especialidad ?? "", idTipoContratacion: String(e.idTipoContratacion ?? ""), idSede: String(e.idSede ?? ""), fechaInicio: fecha(e.fechaInicio) === "No registrado" ? "" : fecha(e.fechaInicio), fechaFin: e.fechaFin ? fecha(e.fechaFin) : "" }); setModal("laboral"); }}
-          className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Edit3 size={16} /> Editar datos laborales</button>
+        {puedeAdministrar && (<button onClick={() => { setFormLaboral({ especialidad: e.especialidad ?? "", idTipoContratacion: String(e.idTipoContratacion ?? ""), idSede: String(e.idSede ?? ""), fechaInicio: fecha(e.fechaInicio) === "No registrado" ? "" : fecha(e.fechaInicio), fechaFin: e.fechaFin ? fecha(e.fechaFin) : "" }); setModal("laboral"); }}
+          className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Edit3 size={16} /> Editar datos laborales</button>)}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Campo titulo="Código de docente" valor={e.codigoDocente} icon={FileBadge} />
@@ -767,14 +772,14 @@ export default function InformacionDocente() {
         <Campo titulo="Fecha de inicio" valor={fecha(e.fechaInicio)} icon={CalendarDays} />
         <Campo titulo="Fecha de finalización" valor={fecha(e.fechaFin)} icon={CalendarDays} />
       </div>
-      <div className="mt-5 border-t border-slate-100 pt-5">
+      {puedeAdministrar && (<div className="mt-5 border-t border-slate-100 pt-5">
         <h3 className="text-sm font-semibold text-slate-800">Cambiar estado laboral</h3>
         <p className="mt-1 text-xs text-slate-500">Actualiza la situación laboral del docente. El acceso al portal se gestiona en Cuenta institucional.</p>
         {destinoLaboral ? <button type="button" onClick={() => { setEstadosLaborales([]); setMotivo(""); setModal("estado"); }}
           className={`mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold focus-visible:ring-2 ${desactivar ? "border-rose-200 text-rose-700 hover:bg-rose-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}>
           {desactivar ? <ShieldAlert size={16} /> : <CheckCircle2 size={16} />} {accionLaboral}
         </button> : <p className="mt-3 text-sm text-slate-500">El cambio requiere un estado laboral activo o inactivo.</p>}
-      </div>
+      </div>)}
     </div>}
 
     {seccion === "cuenta" && <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -787,7 +792,7 @@ export default function InformacionDocente() {
         <Campo titulo="Estado del usuario" valor={e.estadoUsuario} icon={CheckCircle2} />
         <Campo titulo="Identificador de usuario" valor={e.idUsuario} icon={LockKeyhole} />
       </div>
-      <div className="mt-6 border-t border-slate-100 pt-5">
+      {puedeAdministrar && (<div className="mt-6 border-t border-slate-100 pt-5">
         <h3 className="text-sm font-semibold text-slate-800">Acciones administrativas</h3>
         <p className="mt-1 text-xs text-slate-500">Estas operaciones requieren permisos de administrador.</p>
         <div className="mt-4 flex flex-wrap gap-3">
@@ -795,10 +800,10 @@ export default function InformacionDocente() {
             <LockKeyhole size={16} /> Restablecer contraseña</button>{estadoUsuario === "activo" && <button onClick={() => setModal("bloquear")} className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">
               <ShieldAlert size={16} /> Bloquear cuenta</button>}{estadoUsuario === "bloqueado" && <button onClick={() => setModal("desbloquear")} className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
                 <CheckCircle2 size={16} /> Desbloquear cuenta</button>}</div>
-      </div>
+      </div>)}
     </div>}
 
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={ev => { if(ev.target === ev.currentTarget) cerrar(); }}>
+    {puedeAdministrar && modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={ev => { if(ev.target === ev.currentTarget) cerrar(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="modal-titulo" className="my-auto w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
@@ -854,7 +859,7 @@ export default function InformacionDocente() {
             <Input label="Especialidad" maxLength={255} filtrar={filtrarEspecialidad} validar={errorEspecialidad} value={formLaboral.especialidad} onChange={v => setFormLaboral(p => ({ ...p, especialidad: v }))} />
             {[["Contratación", "idTipoContratacion", contratos], ["Sede", "idSede", sedes]].map(([label, campo, opciones]) =>
               <SelectBuscador key={campo} label={label + " *"} value={formLaboral[campo]} options={opciones}
-                searchPlaceholder={"Buscar " + label.toLowerCase() + "..."} onChange={id => setFormLaboral(p => ({ ...p, [campo]: String(id) }))} />)}
+                disabled={!puedeCambiarAsignacion && campo === "idSede"} searchPlaceholder={"Buscar " + label.toLowerCase() + "..."} onChange={id => setFormLaboral(p => ({ ...p, [campo]: String(id) }))} />)}
             <Input label="Fecha de inicio" type="date" required value={formLaboral.fechaInicio} onChange={v => setFormLaboral(p => ({ ...p, fechaInicio: v }))} />
             <Input label="Fecha de finalización (opcional)" type="date" min={formLaboral.fechaInicio} value={formLaboral.fechaFin} onChange={v => setFormLaboral(p => ({ ...p, fechaFin: v }))} />
           </div>
@@ -865,7 +870,7 @@ export default function InformacionDocente() {
             <textarea required minLength={5} maxLength={255} rows={3} value={motivo} onChange={ev => setMotivo(ev.target.value)} className="w-full rounded-xl border border-slate-200 p-3 text-sm" /></label>
         </>}{modal === "documento" && <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Documento actual" required value={formDocumento.documentoActual} onChange={v => setFormDocumento(p => ({ ...p, documentoActual: v }))} />
+            <Input label="Documento actual" disabled value={formDocumento.documentoActual} />
             <div className="min-w-0">
               <SelectBuscador label="Tipo de documento *" searchPlaceholder="Buscar documento..." loading={cargandoTipos} disabled={!!errorTipos}
                 options={tiposDocumento} value={formDocumento.idTipoDocumento}

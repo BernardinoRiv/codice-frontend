@@ -5,7 +5,7 @@ import { menuMaestro } from '../config/menuConfig';
 import apiInterceptor from '../services/apiInterceptor';
 import useSesion from '../hooks/useSesion';
 import { limpiarSesion } from '../utils/sesion';
-import { PERMISOS_RUTAS } from '../config/permisos';
+import { puedeVerRuta } from '../config/permisos';
 
 function DashboardLayout() {
   const sesion = useSesion();
@@ -91,7 +91,7 @@ function DashboardLayout() {
   };
 
   const rolNormalizado = rolUsuario ? rolUsuario.toUpperCase() : '';
-  const navItems = menuMaestro.filter(item => (PERMISOS_RUTAS[item.path] || []).some(rol => sesion.roles.includes(rol)));
+  const navItems = menuMaestro.filter(item => puedeVerRuta(sesion, item.path));
 
   const handleSidebarAction = () => {
     if (isMobile) {

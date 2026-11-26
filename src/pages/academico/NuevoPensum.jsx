@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import CrearPensumPdf from "./CrearPensumPdf";
+import { toast } from "sonner";
 
 const pasos = [
   "Datos generales",
@@ -461,6 +462,13 @@ export default function NuevoPensum({
   const enviarAprobacion = async () => {
     if (
       ciclosCompletos !== ciclos.length ||
+      !prerrequisitosListos
+    ) {
+      setError("Completa todos los ciclos antes de enviar a aprobación.");
+      return;
+    }
+    /*if (
+      ciclosCompletos !== ciclos.length ||
       alertas.length ||
       !prerrequisitosListos
     ) {
@@ -468,7 +476,7 @@ export default function NuevoPensum({
         "Completa todos los ciclos y resuelve los prerrequisitos antes de enviar a aprobación.",
       );
       return;
-    }
+    }*/
     const id = await guardarProgreso();
     if (!id) return;
     setGuardando(true);
@@ -478,8 +486,8 @@ export default function NuevoPensum({
         { method: "PATCH" },
       );
       setEstadoPensum("PENDIENTE_APROBACION");
-      setMensajeGuardado("Pensum enviado a aprobación.");
-      onGuardado?.();
+      toast.success("Se la operacion se completó correctamente.");
+      onVolver?.();
     } catch (e) {
       setError(e.message || "No se pudo enviar a aprobación.");
     } finally {
@@ -1126,10 +1134,15 @@ export default function NuevoPensum({
             ) : estadoPensum === "PLANIFICANDO" ? (
               <button
                 type="button"
-                disabled={
+                /*disabled={
                   guardando ||
                   ciclosCompletos !== ciclos.length ||
                   alertas.length > 0 ||
+                  !prerrequisitosListos
+                }*/
+                disabled={
+                  guardando ||
+                  ciclosCompletos !== ciclos.length ||
                   !prerrequisitosListos
                 }
                 onClick={enviarAprobacion}
