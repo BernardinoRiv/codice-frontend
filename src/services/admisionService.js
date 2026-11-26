@@ -120,11 +120,14 @@ const query = (values) =>
     Object.entries(values).map(([k, v]) => [k, String(v)]),
   ).toString();
 export const admisionService = {
-  getCatalogos: (options) =>
-    request(
-      "/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras",
+  getCatalogos: async (options) => {
+    const data = await request(
+      "/api/v1/catalogos?nombres=tipos_documento,sedes,departamentos,carreras_activas",
       options,
-    ),
+    );
+
+    return { ...data, carreras: data.carreras_activas };
+  },
   getDistritos: (idDepartamento, options) =>
     request(
       `/api/v1/catalogos/distritos?${query({ padreId: idDepartamento })}`,
