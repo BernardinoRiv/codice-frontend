@@ -4,7 +4,7 @@ import { Toaster, toast } from 'sonner';
 import SessionGuard from './components/SessionGuard';
 import useSesion from './hooks/useSesion';
 import { destinoSesion, limpiarSesion } from './utils/sesion';
-import { GRUPOS_RUTAS } from './config/permisos';
+import { GRUPOS_RUTAS, puedeVerRuta } from './config/permisos';
 import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
 import RecuperarPassword from './pages/auth/RecuperarPassword';
@@ -82,10 +82,10 @@ function RutaCambioPassword({ children }) {
   return children;
 }
 
-function RutaPorRol({ rolesPermitidos = [], children }) {
+function RutaConPermiso({ ruta, children }) {
   const sesion = useSesion();
   const { pathname } = useLocation();
-  const permitido = rolesPermitidos.some(rol => sesion.roles.includes(rol));
+  const permitido = puedeVerRuta(sesion, ruta);
   useEffect(() => {
     if (sesion.valida && !sesion.requiereCambio && sesion.roles.length && !permitido) {
       toast.error('Acceso restringido', {
@@ -131,9 +131,9 @@ function App() {
         <Route path="/dashboard" element={<RutaProtegida><DashboardLayout /></RutaProtegida>}>
           <Route index element={<Navigate to="inicio" replace />} />
           <Route path="ajustes" element={<Ajustes />} />
-          {GRUPOS_RUTAS.flatMap(({ roles, rutas }) => rutas.map(path => {
+          {GRUPOS_RUTAS.flatMap(({ rutas }) => rutas.map(path => {
             const Componente = VISTAS[path];
-            return <Route key={path} path={path} element={<RutaPorRol rolesPermitidos={roles}><Componente /></RutaPorRol>} />;
+            return <Route key={path} path={path} element={<RutaConPermiso ruta={`/dashboard/${path}`}><Componente /></RutaConPermiso>} />;
           }))}
           <Route path="*" element={<NotFound />} />
         </Route>
