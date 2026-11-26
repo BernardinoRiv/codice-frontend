@@ -15,7 +15,7 @@ import {
   GraduationCap, KeyRound, Lock, Unlock, RefreshCw, Search, Users,
 } from "lucide-react";
 import useSesion from "../../hooks/useSesion";
-import { PERMISOS_RUTAS } from "../../config/permisos";
+import { puedeAdministrarDirectorio, puedeVerRuta } from "../../config/permisos";
 
 const contratoPorVencer = (e) => {
   if (!e.fechaFin) return false;
@@ -769,7 +769,8 @@ function Lista({ datos: d }) {
   }
 
   const sesion = useSesion();
-  const puedeRegistrar = PERMISOS_RUTAS["/dashboard/registro-docente"].some(r => sesion.roles.includes(r));
+  const puedeRegistrar = puedeVerRuta(sesion, "/dashboard/registro-docente");
+  const puedeAdministrar = puedeAdministrarDirectorio(sesion, "directorio-docentes");
   const ocupado = d.isLoading || d.errorCarga;
   const sinCatalogos = d.cargandoCatalogos || d.errorCatalogos;
   const estados = [...new Set(["ACTIVO", "INACTIVO", ...d.catalogos.estadosDocente.map(e => e.nombre.toUpperCase())])];
@@ -867,9 +868,9 @@ function Lista({ datos: d }) {
                     <td className="px-5 py-4"><EstadoBadge value={e.estadoDocente || "SIN ESTADO"} /></td>
                     <td className="px-5 py-4"><EstadoBadge value={estado} /></td>
                     <td className="px-5 py-4"><div className="flex items-center justify-end gap-2">
-                      <button title={estado === "BLOQUEADO" ? "Desbloquea la cuenta para restablecer la contraseña" : "Restablecer contraseña"} aria-label={`Restablecer contraseña de ${nombre}`} className={"enabled:cursor-pointer disabled:cursor-not-allowed " + (icono)}
-                        disabled={!puedeRegistrar || estado !== "ACTIVO" || guardando || d.reseteandoUsuario !== null} onClick={() => d.setModalReset(e)}><KeyRound size={17} /></button>
-                      {puedeRegistrar && (bloquear || estado === "BLOQUEADO") && (
+                      {puedeAdministrar && (<button title={estado === "BLOQUEADO" ? "Desbloquea la cuenta para restablecer la contraseña" : "Restablecer contraseña"} aria-label={`Restablecer contraseña de ${nombre}`} className={"enabled:cursor-pointer disabled:cursor-not-allowed " + (icono)}
+                        disabled={estado !== "ACTIVO" || guardando || d.reseteandoUsuario !== null} onClick={() => d.setModalReset(e)}><KeyRound size={17} /></button>)}
+                      {puedeAdministrar && (bloquear || estado === "BLOQUEADO") && (
                         <button type="button" title={etiqueta} aria-label={`${etiqueta} de ${nombre}`}
                           disabled={guardando || d.reseteandoUsuario !== null}
                           className={`enabled:cursor-pointer disabled:cursor-not-allowed inline-flex h-9 w-9 items-center justify-center rounded-lg border disabled:opacity-40 ${bloquear ? "border-rose-200 text-rose-700 hover:bg-rose-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}

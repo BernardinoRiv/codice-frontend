@@ -1,6 +1,6 @@
 import useSesion from "../../hooks/useSesion";
 import { ROLES } from "../../utils/sesion";
-import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
+import { limpiarNombreRegistro, limpiarDireccionRegistro, validarIdentidadRegistro, normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -154,9 +154,9 @@ function SelectBuscador({
             if (!open) setSearch('');
           }
         }}
-        className="w-full h-[50px] bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
+        className="w-full min-h-[50px] py-2.5 bg-slate-50/50 text-slate-900 border border-slate-200 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 transition-all shadow-sm disabled:bg-slate-100/50 disabled:text-slate-500 disabled:cursor-not-allowed flex items-center justify-between text-left gap-3"
       >
-        <span className={`truncate ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
+        <span className={`min-w-0 whitespace-normal break-words leading-snug ${seleccionado ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
           {seleccionado ? seleccionado.nombre : placeholder}
         </span>
         <svg
@@ -569,6 +569,11 @@ function RegistroEmpleado() {
   const errorCorreo = validarCorreoRegistro(formData.correoPersonal);
   const errorNacimiento = validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
   const validarContactoNacimiento = () => {
+    const errorIdentidad = validarIdentidadRegistro(formData);
+    if (errorIdentidad) {
+      toast.warning('Revisa los datos personales', { description: errorIdentidad });
+      return false;
+    }
     const mensaje = validarCorreoRegistro(formData.correoPersonal) || validarNacimientoRegistro(formData.fechaNacimiento, esTipoDui() ? 18 : 15);
     if (mensaje) { toast.warning('Revisa los datos personales', { description: mensaje }); return false; }
     return true;
@@ -905,8 +910,8 @@ function RegistroEmpleado() {
                     <label className={labelClassName}>Nombres</label>
                     <input
                       type="text"
-                      value={formData.nombres}
-                      onChange={(e) => setFormData(prev => ({ ...prev, nombres: e.target.value.toUpperCase().replace(/[0-9<>]/g, '') }))}
+                      maxLength={100} value={formData.nombres}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nombres: limpiarNombreRegistro(e.target.value) }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       className={inputClassName}
@@ -917,8 +922,8 @@ function RegistroEmpleado() {
                     <label className={labelClassName}>Apellidos</label>
                     <input
                       type="text"
-                      value={formData.apellidos}
-                      onChange={(e) => setFormData(prev => ({ ...prev, apellidos: e.target.value.toUpperCase().replace(/[0-9<>]/g, '') }))}
+                      maxLength={100} value={formData.apellidos}
+                      onChange={(e) => setFormData(prev => ({ ...prev, apellidos: limpiarNombreRegistro(e.target.value) }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       className={inputClassName}
@@ -978,7 +983,7 @@ function RegistroEmpleado() {
                     <div className="h-5 mb-1.5 ml-1 flex items-center">
                       <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-widest">Correo personal</label>
                     </div>
-                    <input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={254}
+                    <input aria-invalid={Boolean(formData.correoPersonal && errorCorreo)} aria-describedby={formData.correoPersonal && errorCorreo ? "error-correo" : undefined} maxLength={150}
                       type="email"
                       value={formData.correoPersonal}
                       onChange={(e) => setFormData(prev => ({ ...prev, correoPersonal: e.target.value.toLowerCase().trim() }))}
@@ -1018,8 +1023,8 @@ function RegistroEmpleado() {
                   <div className="md:col-span-2">
                     <label className={labelClassName}>Dirección detallada</label>
                     <textarea
-                      value={formData.direccion}
-                      onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value.replace(/[<>]/g, '') }))}
+                      maxLength={255} value={formData.direccion}
+                      onChange={(e) => setFormData(prev => ({ ...prev, direccion: limpiarDireccionRegistro(e.target.value) }))}
                       required
                       disabled={!documentoVerificado || personaExistente}
                       rows="2"
@@ -1033,7 +1038,7 @@ function RegistroEmpleado() {
               <div className={`transition-opacity duration-300 ${!documentoVerificado ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 <h3 className={sectionTitleClassName}><div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div> Datos institucionales {esEmpleadoActivo && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Solo Lectura</span>}</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-5">
                   <div className="md:col-span-1">
                     <SelectBuscador
                       label="Sede Operativa"
@@ -1144,9 +1149,9 @@ function RegistroEmpleado() {
               <div className="border-t border-slate-100 pt-5 space-y-4">
                 <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Correo</span><span className="font-bold text-slate-800">{getPreviewEmail()}</span></div>
                 <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Documento</span><span className="font-bold text-slate-800 text-right">{formData.numeroDocumento || '----------'}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Sede operativa</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getSedeTexto()}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Área</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getAreaTexto()}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Cargo</span><span className="font-bold text-slate-800 text-right w-1/2 truncate">{getCargoTexto()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Sede operativa</span><span className="font-bold text-slate-800 text-right w-1/2 min-w-0 break-words">{getSedeTexto()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Área</span><span className="font-bold text-slate-800 text-right w-1/2 min-w-0 break-words">{getAreaTexto()}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-600 font-medium">Cargo</span><span className="font-bold text-slate-800 text-right w-1/2 min-w-0 break-words">{getCargoTexto()}</span></div>
               </div>
 
               <div className="mt-8 pt-5 border-t border-dashed border-slate-200">
