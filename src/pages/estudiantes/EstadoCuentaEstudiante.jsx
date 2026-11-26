@@ -1,9 +1,23 @@
-import { normalizarCuenta, descargarPdf } from '../../utils/vistasSeguras';
+import { normalizarCuenta, abrirPdfNuevaPestana } from '../../utils/vistasSeguras';
 import { leerSesion } from '../../utils/sesion';
 import usePagoSeguro from '../../hooks/usePagoSeguro';
 import AvisoPagoPendiente from '../../components/AvisoPagoPendiente';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+
+function DetalleDescuentoBeca({ montoBase, montoDescuento, montoTotal, className = '' }) {
+  const descuento = Number(montoDescuento);
+  if (!Number.isFinite(descuento) || descuento <= 0) return null;
+
+  const base = Number(montoBase);
+  const neto = Number(montoTotal);
+  const partes = [];
+  if (Number.isFinite(base)) partes.push(`Base: $${base.toFixed(2)}`);
+  partes.push(`Descuento beca: -$${descuento.toFixed(2)}`);
+  if (Number.isFinite(neto)) partes.push(`Neto: $${neto.toFixed(2)}`);
+
+  return <span className={`text-[10px] font-bold text-emerald-700 ${className}`}>{partes.join(' · ')}</span>;
+}
 
 const EstadoCuentaEstudiante = () => {
   const { pendiente, enviar, verificar } = usePagoSeguro();
@@ -121,15 +135,10 @@ const EstadoCuentaEstudiante = () => {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/pagos/${idPago}/comprobante`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (response.ok) {
-        await descargarPdf(response, `comprobante-${idPago}.pdf`);
-        toast.success('Documento generado', { id: toastId });
-      } else {
-        toast.error('Error al generar el documento', { id: toastId });
-      }
-    } catch {
-      toast.error('Error de conexión al generar pdf', { id: toastId });
+      await abrirPdfNuevaPestana(response, `comprobante-${idPago}.pdf`);
+      toast.success('Documento generado', { id: toastId });
+    } catch (e) {
+      toast.error(e.message || 'Error al generar el documento', { id: toastId });
     }
   };
 
@@ -357,6 +366,12 @@ const EstadoCuentaEstudiante = () => {
                               <div>
                                 <h4 className="font-bold text-slate-900">{cargo.concepto}</h4>
                                 <p className="text-xs text-slate-500 mt-0.5">{cargo.mes} Vence: {cargo.fechaVencimiento}</p>
+                                <DetalleDescuentoBeca
+                                  montoBase={cargo.montoBase}
+                                  montoDescuento={cargo.montoDescuento}
+                                  montoTotal={cargo.montoTotal ?? cargo.monto}
+                                  className="block mt-1 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md w-fit"
+                                />
                               </div>
 
                               <div className="text-right">
@@ -398,8 +413,23 @@ const EstadoCuentaEstudiante = () => {
                             <tr key={pago.idPago} className="hover:bg-slate-50 transition-colors">
                               <td className="px-6 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{pago.numeroRecibo}</td>
                               <td className="px-6 py-4 text-slate-600 font-medium whitespace-nowrap">{pago.fechaPago}</td>
-                              <td className="px-6 py-4 font-bold text-slate-900 min-w-[200px]">{pago.concepto}</td>
-                              <td className="px-6 py-4 text-right font-extrabold text-emerald-700 whitespace-nowrap">${pago.montoPagado.toFixed(2)}</td>
+                              <td className="px-6 py-4 font-bold text-slate-900 min-w-[200px]">
+                                {pago.concepto}
+                                <DetalleDescuentoBeca
+                                  montoBase={pago.montoBase}
+                                  montoDescuento={pago.montoDescuento}
+                                  montoTotal={pago.montoTotal ?? pago.montoPagado}
+                                  className="block mt-1"
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                                ${pago.montoPagado.toFixed(2)}
+                                {Number(pago.montoDescuento) > 0 && (
+                                  <span className="block text-[10px] font-bold text-emerald-700 mt-1">
+                                    Neto: ${Number(pago.montoTotal ?? pago.montoPagado).toFixed(2)}
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-6 py-4 text-center whitespace-nowrap">
                                 <button
                                   onClick={() => verFacturaEnOtraPestana(pago.idPago)}

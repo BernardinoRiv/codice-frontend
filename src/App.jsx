@@ -9,10 +9,11 @@ import Login from './pages/auth/Login';
 import ForzarPassword from './pages/auth/ForzarPassword';
 import RecuperarPassword from './pages/auth/RecuperarPassword';
 import DashboardLayout from './components/DashboardLayout';
+import NotFound from './pages/NotFound';
 import Inicio from './pages/inicio/Inicio'; 
 import IngresoNotas from './pages/docentes/IngresoNotas';
 import RegistroDocente from './pages/docentes/RegistroDocente';
-import ListaDocentes from './pages/docentes/ListaDocentes';
+import DirectorioDocentes, { InformacionDocente } from './pages/docentes/DirectorioDocentes';
 import RegistroEmpleado from './pages/empleados/RegistroEmpleado';
 import ConsultaNotas from './pages/estudiantes/ConsultaNotas';
 import Ajustes from './pages/perfil/Ajustes';
@@ -26,10 +27,18 @@ import EstadoCuentaEstudiante from './pages/estudiantes/EstadoCuentaEstudiante';
 import GestionSecciones from './pages/academico/GestionSecciones';
 import RegistroNuevoIngreso from './pages/academico/RegistroNuevoIngreso';
 import MisClasesPensum from './pages/estudiantes/MisClasesPensum';
+import MatriculaContinua from './pages/estudiantes/MatriculaContinua';
 import Facturas from './pages/finanzas/Facturas';
 import GestionCarreras from './pages/academico/GestionCarreras';
 import GestionPensum from './pages/academico/GestionPensum';
+import GestionMaterias from './pages/academico/GestionMaterias';
 import AdmisionOnline from './pages/academico/AdmisionOnline';
+import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
+import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
+import DirectorioEmpleados from './pages/empleados/DirectorioEmpleados';
+import InformacionEmpleado from './pages/empleados/InformacionEmpleado';
+
+
 
 const VISTAS = {
   'inicio': Inicio,
@@ -37,7 +46,9 @@ const VISTAS = {
   'registro-docente': RegistroDocente,
   'carreras': GestionCarreras,
   'pensum': GestionPensum,
-  'directorio-docentes': ListaDocentes,
+  'materias': GestionMaterias,
+  'directorio-docentes': DirectorioDocentes,
+  'directorio-docentes/:idDocente': InformacionDocente,
   'nuevo-ingreso': RegistroNuevoIngreso,
   'oferta-academica': AperturaSeccion,
   'ciclos-planificacion': CiclosPlanificacion,
@@ -46,11 +57,16 @@ const VISTAS = {
   'mis-notas': ConsultaNotas,
   'mi-estado-cuenta': EstadoCuentaEstudiante,
   'escanear-asistencia': EscanearAsistencia,
+  'matricula': MatriculaContinua,
   'notas': IngresoNotas,
   'asistencias': Asistencias,
   'pagos': VentanillaPagos,
   'aranceles': CatalogoAranceles,
-  'facturas': Facturas
+  'facturas': Facturas,
+  'directorio-estudiantes': DirectorioEstudiantes,
+  'directorio-estudiantes/:idEstudiante': InformacionEstudiante,
+  'directorio-empleados': DirectorioEmpleados,
+  'directorio-empleados/:idEmpleado': InformacionEmpleado
 };
 
 function RutaProtegida({ children }) {
@@ -119,8 +135,9 @@ function App() {
             const Componente = VISTAS[path];
             return <Route key={path} path={path} element={<RutaPorRol rolesPermitidos={roles}><Componente /></RutaPorRol>} />;
           }))}
+          <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

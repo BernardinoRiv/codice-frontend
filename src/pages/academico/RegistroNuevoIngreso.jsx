@@ -1,5 +1,5 @@
 import { normalizarBusqueda, validarCorreoRegistro, validarNacimientoRegistro, limitesFechaNacimiento } from '../../utils/validacionesRegistro';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
@@ -83,6 +83,54 @@ const obtenerSedeDesdeToken = () => {
     return decodedJson.idSede || decodedJson.sedeId || decodedJson.id_sede || '';
   } catch (e) {
     return '';
+  }
+};
+
+const numeroArancel = (valor) => {
+  const numero = Number(valor);
+  return Number.isFinite(numero) && numero >= 0 ? Math.round((numero + Number.EPSILON) * 100) / 100 : null;
+};
+
+const esCarreraPosgrado = (carrera) => {
+  const texto = normalizarBusqueda([
+    carrera?.nivel,
+    carrera?.nombreNivel,
+    carrera?.nivelAcademico,
+    carrera?.nivelNombre,
+    carrera?.nombreCarrera
+  ].filter(Boolean).join(' '));
+  const esPosgrado = /posgrado|maestria|doctorado|especializacion|tesis/.test(texto);
+  const esPregrado = /pregrado|licenciatura|tecnico|grado/.test(texto);
+  return esPosgrado && !esPregrado;
+};
+
+const construirUrlComprobante = (data) => {
+  const endpoint = data?.urlComprobante || data?.comprobanteUrl || data?.urlPrevisualizacion || data?.previewUrl || data?.comprobante?.url || data?.comprobante?.urlPrevisualizacion;
+  if (typeof endpoint === 'string' && endpoint.trim()) return { url: endpoint.trim(), local: false };
+
+  const Candidatos = [
+    data?.comprobantePdf,
+    data?.comprobantePDF,
+    data?.comprobanteBase64,
+    data?.pdfBase64,
+    data?.pdf,
+    typeof data?.comprobante === 'string' ? data.comprobante : null,
+    data?.comprobante?.base64,
+    data?.comprobante?.contenido
+  ];
+  const base64 = Candidatos.find(valor => typeof valor === 'string' && valor.trim());
+  if (!base64) return null;
+
+  const limpio = base64.replace(/^data:application\/(?:pdf|octet-stream|x-pdf);base64,/i, '').replace(/\s/g, '');
+  if (!limpio || !/^[A-Za-z0-9+/]+={0,2}$/.test(limpio)) return null;
+
+  try {
+    const binario = atob(limpio);
+    const bytes = new Uint8Array(binario.length);
+    for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+    return { url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), local: true };
+  } catch {
+    return null;
   }
 };
 
@@ -219,6 +267,22 @@ function SelectBuscador({ label, loading = false, value, onChange, options = [],
   );
 }
 
+function FilaResumen({ etiqueta, valor, tipo = 'normal', conBorde = false }) {
+  const estilos = {
+    normal: 'font-bold text-slate-800',
+    fuerte: 'font-extrabold text-slate-900',
+    total: 'font-black text-lg text-slate-900',
+    descuento: 'font-extrabold text-emerald-600',
+    externo: 'font-extrabold text-blue-700'
+  };
+  return (
+    <div className={`flex justify-between items-center gap-3 text-sm ${conBorde ? 'pt-3 border-t border-slate-200' : ''}`}>
+      <span className="text-slate-500 font-medium">{etiqueta}</span>
+      <span className={`${estilos[tipo] || estilos.normal} text-right whitespace-nowrap`}>{valor}</span>
+    </div>
+  );
+}
+
 export default function RegistroNuevoIngreso() {
   const [isLoading, setIsLoading] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(false);
@@ -238,7 +302,10 @@ export default function RegistroNuevoIngreso() {
   const [beneficiosDb, setBeneficiosDb] = useState([]);
   const [tipoBeca, setTipoBeca] = useState('1'); 
   const [promocionSeleccionada, setPromocionSeleccionada] = useState(''); 
-  const [arancelesCiclo, setArancelesCiclo] = useState({ matricula: 0, cuota: 0, cuotaFranja: 0 });
+  const [arancelesPorConcepto, setArancelesPorConcepto] = useState({ matricula: null, cuota: null, cuotaFranja: null });
+  const [montosApertura, setMontosApertura] = useState({ matriculaPregrado: null, cuotaPregrado: null, matriculaMaestria: null, cuotaMaestria: null });
+  const [comprobanteBeca, setComprobanteBeca] = useState(null);
+  const urlComprobanteLocalRef = useRef(null);
 
   const [formData, setFormData] = useState({
     idPersona: null, idTipoDocumento: '', numeroDocumento: '', nombres: '', apellidos: '',
@@ -246,6 +313,10 @@ export default function RegistroNuevoIngreso() {
     idSede: obtenerSedeDesdeToken(),
     idCarreraSede: '', idPensum: '', idGruposSeleccionados: []
   });
+
+  useEffect(() => () => {
+    if (urlComprobanteLocalRef.current) URL.revokeObjectURL(urlComprobanteLocalRef.current);
+  }, []);
 
   const esTipoDui = () => {
     if (String(formData.idTipoDocumento) === '1') return true;
@@ -295,6 +366,7 @@ export default function RegistroNuevoIngreso() {
   }, []);
 
   useEffect(() => {
+    let activo = true;
     const fetchCicloActivo = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -305,27 +377,44 @@ export default function RegistroNuevoIngreso() {
           const data = await res.json();
           const nombreCiclo = data.ciclo && data.anio ? `${data.ciclo}-${data.anio}` : data.nombre || data.codigoCiclo;
           setCicloActivoStr(nombreCiclo);
-          
+
           if (data.idCiclo) {
-            const resAranceles = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/aranceles/ciclo/${data.idCiclo}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const [resAranceles, resApertura] = await Promise.all([
+              fetch(`${import.meta.env.VITE_API_URL}/api/v1/finanzas/aranceles/ciclo/${data.idCiclo}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              }),
+              fetch(`${import.meta.env.VITE_API_URL}/api/v1/ciclos/${data.idCiclo}/aranceles-apertura`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              })
+            ]);
+
             if (resAranceles.ok) {
               const arancelesData = await resAranceles.json();
-              let mat = 0, cuo = 0, cuoFranja = 0;
+              let mat = null, cuo = null, cuoFranja = null;
               arancelesData.forEach(a => {
-                const nombre = a.concepto.toLowerCase();
+                const nombre = String(a.concepto || '').toLowerCase();
                 if (nombre.includes('matrícula') || nombre.includes('matricula')) mat = a.montoBase;
                 else if (nombre.includes('franja')) cuoFranja = a.montoBase;
                 else if (nombre.includes('cuota') || nombre.includes('mensual')) cuo = a.montoBase;
               });
-              setArancelesCiclo({ matricula: mat, cuota: cuo, cuotaFranja: cuoFranja || mat });
+              if (activo) setArancelesPorConcepto({ matricula: numeroArancel(mat), cuota: numeroArancel(cuo), cuotaFranja: numeroArancel(cuoFranja) });
+            }
+
+            if (resApertura.ok) {
+              const apertura = await resApertura.json();
+              if (activo) setMontosApertura({
+                matriculaPregrado: numeroArancel(apertura.montoMatriculaPregrado),
+                cuotaPregrado: numeroArancel(apertura.montoCuotaPregrado),
+                matriculaMaestria: numeroArancel(apertura.montoMatriculaMaestria),
+                cuotaMaestria: numeroArancel(apertura.montoCuotaMaestria)
+              });
             }
           }
         }
       } catch (error) {}
     };
     fetchCicloActivo();
+    return () => { activo = false; };
   }, []);
 
   useEffect(() => {
@@ -429,6 +518,11 @@ export default function RegistroNuevoIngreso() {
 
   const handleReset = () => {
     toast.dismiss();
+    if (urlComprobanteLocalRef.current) {
+      URL.revokeObjectURL(urlComprobanteLocalRef.current);
+      urlComprobanteLocalRef.current = null;
+    }
+    setComprobanteBeca(null);
     setDocumentoVerificado(false);
     setPersonaExistente(false);
     setTipoBeca('1');
@@ -606,8 +700,13 @@ export default function RegistroNuevoIngreso() {
         throw new Error(detalle || 'Error al generar pre-matrícula.');
       }
       
+      const comprobante = construirUrlComprobante(data);
       setModalConfirmar(false);
       handleReset();
+      if (comprobante) {
+        if (comprobante.local) urlComprobanteLocalRef.current = comprobante.url;
+        setComprobanteBeca(comprobante);
+      }
       toast.success(data.mensaje || 'Pre-matrícula generada', { description: data.instrucciones, duration: 10000 });
     } catch (err) {
       toast.error('Rechazado por el servidor', { description: err.message });
@@ -616,19 +715,44 @@ export default function RegistroNuevoIngreso() {
     }
   };
 
-  const getFinanzas = () => {
-    const cuotaMensualBase = tipoBeca === '2' ? arancelesCiclo.cuotaFranja : arancelesCiclo.cuota;
-    const subtotal = arancelesCiclo.matricula + (cuotaMensualBase * 6);
-    
-    let descMatricula = 0;
-    let descCuotaTotal = 0; 
-    let descCuotaUnica = 0; 
+  const carreraSeleccionada = catalogos.carreras?.find(c => String(c.idCarreraSede ?? c.id) === String(formData.idCarreraSede));
+  const nivelSeleccionado = esCarreraPosgrado(carreraSeleccionada) ? 'POSGRADO' : 'PREGRADO';
+  const arancelesCiclo = useMemo(() => {
+    const esPosgrado = nivelSeleccionado === 'POSGRADO';
+    const matriculaNivel = esPosgrado ? montosApertura.matriculaMaestria : montosApertura.matriculaPregrado;
+    const cuotaNivel = esPosgrado ? montosApertura.cuotaMaestria : montosApertura.cuotaPregrado;
+    const cuotaBase = cuotaNivel ?? arancelesPorConcepto.cuota ?? arancelesPorConcepto.matricula ?? 0;
 
-    if (tipoBeca === '3') {
-      descMatricula = arancelesCiclo.matricula;
-      descCuotaTotal = cuotaMensualBase * 6;
-    }
-    else if (tipoBeca === '1' && promocionSeleccionada !== '0' && promocionSeleccionada !== '') {
+    return {
+      nivel: nivelSeleccionado,
+      matricula: matriculaNivel ?? arancelesPorConcepto.matricula ?? 0,
+      cuota: cuotaBase,
+      cuotaFranja: arancelesPorConcepto.cuotaFranja ?? cuotaBase
+    };
+  }, [nivelSeleccionado, montosApertura, arancelesPorConcepto]);
+
+  const getFinanzas = () => {
+    const redondear = valor => Math.round((valor + Number.EPSILON) * 100) / 100;
+    const matricula = arancelesCiclo.matricula;
+    const cuotaBase = arancelesCiclo.cuota;
+    const subsidioDesdeArancel = cuotaBase - arancelesCiclo.cuotaFranja;
+    const subsidioUnitario = subsidioDesdeArancel > 0
+      ? redondear(subsidioDesdeArancel)
+      : (arancelesCiclo.nivel === 'PREGRADO' && cuotaBase > 0 ? 17 : 0);
+    const cuotaBecada = Math.max(0, redondear(cuotaBase - subsidioUnitario));
+    const subtotal = redondear(matricula + (cuotaBase * 6));
+
+    let descMatricula = 0;
+    let descCuotaTotal = 0;
+    let descCuotaUnica = 0;
+    let descUnitarioPromo = 0;
+
+    if (tipoBeca === '2') {
+      descCuotaTotal = redondear(subsidioUnitario * 6);
+    } else if (tipoBeca === '3') {
+      descMatricula = matricula;
+      descCuotaTotal = redondear(cuotaBase * 6);
+    } else if (tipoBeca === '1' && promocionSeleccionada !== '0' && promocionSeleccionada !== '') {
       const promo = beneficiosDb.find(b => String(b.id) === String(promocionSeleccionada));
       if (promo) {
         const hoy = new Date().toISOString().split('T')[0];
@@ -639,27 +763,42 @@ export default function RegistroNuevoIngreso() {
           let valorDescCuota = 0;
 
           if (promo.porcentaje > 0) {
-            valorDescCuota = (cuotaMensualBase * promo.porcentaje) / 100;
+            valorDescCuota = (cuotaBase * promo.porcentaje) / 100;
           } else if (promo.monto > 0) {
-            valorDescCuota = Math.min(promo.monto, cuotaMensualBase);
+            valorDescCuota = Math.min(promo.monto, cuotaBase);
           }
+          descUnitarioPromo = redondear(valorDescCuota);
 
           if (isFeria) {
-            descCuotaUnica = valorDescCuota;
+            descCuotaUnica = descUnitarioPromo;
           } else {
-            descCuotaTotal = valorDescCuota * 6;
+            descCuotaTotal = redondear(descUnitarioPromo * 6);
           }
         }
       }
     }
 
-    const descuentoTotal = descMatricula + descCuotaTotal + descCuotaUnica;
+    const descuento = redondear(descMatricula + descCuotaTotal + descCuotaUnica);
+    const total = Math.max(0, redondear(subtotal - descuento));
+    const cuotaInicial = tipoBeca === '2' ? cuotaBecada : cuotaBase;
+    const pagoInicial = (tipoBeca === '3' || tipoBeca === '4')
+      ? 0
+      : Math.max(0, redondear(matricula - descMatricula + cuotaInicial - descUnitarioPromo));
 
     return {
-      subtotal: subtotal,
-      descuento: descuentoTotal,
-      total: subtotal - descuentoTotal,
-      cuotaMensualGenerada: cuotaMensualBase
+      nivel: arancelesCiclo.nivel,
+      matricula,
+      cuotaBase,
+      cuotaBecada,
+      subsidioUnitario,
+      subtotal,
+      descuentoMatricula: descMatricula,
+      descuentoCuotas: descCuotaTotal,
+      descuentoUnico: descCuotaUnica,
+      descuento,
+      total,
+      pagoInicial,
+      cubiertoTerceros: tipoBeca === '4' ? subtotal : 0
     };
   };
 
@@ -889,15 +1028,85 @@ export default function RegistroNuevoIngreso() {
                  )}
                </div>
                
-               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                 <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">Matrícula</span><span className="font-bold text-slate-800">${arancelesCiclo.matricula.toFixed(2)}</span></div>
-                 <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-medium">6 Cuotas mensuales de ${finanzas.cuotaMensualGenerada.toFixed(2)}</span><span className="font-bold text-slate-800">${(finanzas.cuotaMensualGenerada * 6).toFixed(2)}</span></div>
-                 <div className="flex justify-between items-center text-sm pt-3 border-t border-slate-200"><span className="text-slate-500 font-bold uppercase tracking-wider text-[11px]">Subtotal Acumulado</span><span className="font-extrabold text-slate-900">${finanzas.subtotal.toFixed(2)}</span></div>
-                 {finanzas.descuento > 0 && (
-                   <div className="flex justify-between items-center text-sm"><span className="text-emerald-600 font-bold uppercase tracking-wider text-[11px]">Beneficio Aplicado</span><span className="font-extrabold text-emerald-600">-${finanzas.descuento.toFixed(2)}</span></div>
-                 )}
-                 <div className="flex justify-between items-center text-sm pt-3 border-t border-slate-200"><span className="text-slate-900 font-bold uppercase tracking-wider text-[12px]">Total a Pagar Hoy</span><span className="font-black text-lg text-slate-900">${finanzas.total.toFixed(2)}</span></div>
-               </div>
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-slate-900 text-white px-2.5 py-1 rounded-md">
+                    Nivel: {finanzas.nivel === 'POSGRADO' ? 'Posgrado' : 'Pregrado'}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">
+                    Arancel {cicloActivoStr || 'del ciclo activo'}
+                  </span>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                  {tipoBeca === '1' && (
+                    <>
+                      <FilaResumen etiqueta="Matrícula (sin descuento)" valor={`$${finanzas.matricula.toFixed(2)}`} />
+                      <FilaResumen etiqueta={`6 cuotas mensuales de $${finanzas.cuotaBase.toFixed(2)}`} valor={`$${(finanzas.cuotaBase * 6).toFixed(2)}`} />
+                      <FilaResumen etiqueta="Subtotal sin beca" valor={`$${finanzas.subtotal.toFixed(2)}`} conBorde />
+                      {finanzas.descuento > 0 && (
+                        <>
+                          <FilaResumen etiqueta="Beneficio aplicado a las 6 cuotas" valor={`-$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
+                          <FilaResumen etiqueta="Total del ciclo" valor={`$${finanzas.total.toFixed(2)}`} tipo="fuerte" />
+                        </>
+                      )}
+                      <FilaResumen etiqueta="Pago inicial para activar (Matrícula + Cuota 1)" valor={`$${finanzas.pagoInicial.toFixed(2)}`} tipo="total" conBorde />
+                    </>
+                  )}
+
+                  {tipoBeca === '2' && (
+                    <>
+                      <FilaResumen etiqueta="Matrícula (sin descuento)" valor={`$${finanzas.matricula.toFixed(2)}`} />
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Subsidio aplicado a las 6 mensualidades</p>
+                        <p className="text-xs text-emerald-900 font-bold mt-1">
+                          ${finanzas.cuotaBase.toFixed(2)} - ${finanzas.subsidioUnitario.toFixed(2)} = ${finanzas.cuotaBecada.toFixed(2)} c/u
+                        </p>
+                        <div className="flex justify-between items-center mt-2 text-sm">
+                          <span className="text-slate-500 font-medium">6 cuotas becadas</span>
+                          <span className="font-extrabold text-emerald-700">${(finanzas.cuotaBecada * 6).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <FilaResumen etiqueta="Subtotal sin beca" valor={`$${finanzas.subtotal.toFixed(2)}`} conBorde />
+                      <FilaResumen etiqueta="Descuento Franja Becaria (6 cuotas)" valor={`-$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
+                      <FilaResumen etiqueta="Total del ciclo" valor={`$${finanzas.total.toFixed(2)}`} tipo="fuerte" />
+                      <FilaResumen etiqueta={`Pago inicial requerido (Matrícula $${finanzas.matricula.toFixed(2)} + Cuota 1 becada $${finanzas.cuotaBecada.toFixed(2)})`} valor={`$${finanzas.pagoInicial.toFixed(2)}`} tipo="total" conBorde />
+                    </>
+                  )}
+
+                  {tipoBeca === '3' && (
+                    <>
+                      <FilaResumen etiqueta="Subtotal sin beca" valor={`$${finanzas.subtotal.toFixed(2)}`} conBorde />
+                      <FilaResumen etiqueta="Descuento Beca 100%" valor={`-$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
+                      <FilaResumen etiqueta="Total a pagar" valor={`$${finanzas.total.toFixed(2)}`} tipo="total" conBorde />
+                      <p className="text-xs text-emerald-800 font-semibold leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                        El estudiante quedará matriculado de inmediato y recibirá su comprobante PDF de beca y credenciales por correo.
+                      </p>
+                    </>
+                  )}
+
+                  {tipoBeca === '4' && (
+                    <>
+                      <FilaResumen etiqueta="Monto total cubierto por entidad externa" valor={`$${finanzas.cubiertoTerceros.toFixed(2)}`} tipo="externo" />
+                      <FilaResumen etiqueta="Descuento institucional" valor="$0.00" />
+                      <FilaResumen etiqueta="Total del ciclo" valor={`$${finanzas.subtotal.toFixed(2)}`} tipo="fuerte" conBorde />
+                      <FilaResumen etiqueta="Pago inicial requerido al aspirante" valor={`$${finanzas.pagoInicial.toFixed(2)}`} tipo="total" conBorde />
+                      <p className="text-xs text-blue-800 font-semibold leading-relaxed bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        El ciclo será cancelado por la entidad externa. El aspirante no realiza este pago en colecturía.
+                      </p>
+                    </>
+                  )}
+
+                  {comprobanteBeca && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(comprobanteBeca.url, '_blank', 'noopener,noreferrer')}
+                      className="w-full py-2.5 mt-1 bg-emerald-600 text-white text-xs font-extrabold uppercase tracking-wider rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      Abrir comprobante PDF de beca
+                    </button>
+                  )}
+                </div>
+
              </div>
 
              <div className="pt-8 flex justify-end">
@@ -972,11 +1181,19 @@ export default function RegistroNuevoIngreso() {
               </div>
 
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 space-y-3 mb-6">
-                <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Total a Pagar</span><span className="font-black text-xl text-slate-900">${finanzas.total.toFixed(2)}</span></div>
-                {finanzas.descuento > 0 && (<div className="flex justify-between items-center text-[11px]"><span className="text-slate-400 font-medium">Subtotal sin descuento</span><span className="text-slate-400 font-medium line-through">${finanzas.subtotal.toFixed(2)}</span></div>)}
+                <div className="flex justify-between items-center text-sm"><span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pago inicial requerido</span><span className="font-black text-xl text-slate-900">${finanzas.pagoInicial.toFixed(2)}</span></div>
+                {tipoBeca === '3' && (<div className="flex justify-between items-center text-[11px]"><span className="text-emerald-700 font-semibold">Beca 100% · total del ciclo</span><span className="text-emerald-700 font-bold">${finanzas.total.toFixed(2)}</span></div>)}
+                {tipoBeca === '4' && (<div className="flex justify-between items-center text-[11px]"><span className="text-blue-700 font-semibold">Cubierto por entidad externa</span><span className="text-blue-700 font-bold">${finanzas.cubiertoTerceros.toFixed(2)}</span></div>)}
+                {tipoBeca !== '3' && tipoBeca !== '4' && finanzas.descuento > 0 && (<div className="flex justify-between items-center text-[11px]"><span className="text-slate-400 font-medium">Subtotal sin descuento</span><span className="text-slate-400 font-medium line-through">${finanzas.subtotal.toFixed(2)}</span></div>)}
               </div>
 
-              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6">Se reservarán los cupos en los grupos seleccionados y se generará la deuda en el sistema financiero institucional para ser cancelada en colectaduría.</p>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6">
+                {tipoBeca === '3'
+                  ? 'El aspirante quedará matriculado de inmediato. El comprobante de beca y las credenciales se enviarán por correo.'
+                  : tipoBeca === '4'
+                    ? 'La entidad externa cubrirá el ciclo completo; se reservarán los cupos sin generar deuda para el aspirante.'
+                    : 'Se reservarán los cupos en los grupos seleccionados y se generará la deuda en el sistema financiero institucional para ser cancelada en colectaduría.'}
+              </p>
               
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setModalConfirmar(false)} disabled={isLoading} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors disabled:opacity-50">Cancelar</button>

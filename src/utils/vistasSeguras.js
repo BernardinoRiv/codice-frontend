@@ -7,8 +7,11 @@ export function numeroMonetario(valor) {
 
 export function normalizarCuenta(data) {
   if (!data || !data.estudiante || !Array.isArray(data.cargosPendientes)) throw new Error('El estado de cuenta recibido no es válido.');
-  const convertir = objeto => Object.fromEntries(Object.entries(objeto).map(([clave, valor]) =>
-    /^(monto|deuda|saldo|totalPagado)/.test(clave) ? [clave, numeroMonetario(valor)] : [clave, valor]));
+  const convertir = objeto => Object.fromEntries(Object.entries(objeto).map(([clave, valor]) => {
+    if (!/^(monto|deuda|saldo|totalPagado)/.test(clave)) return [clave, valor];
+    if ((clave === 'montoDescuento' || clave === 'montoBase') && (valor === null || valor === undefined || valor === '')) return [clave, 0];
+    return [clave, numeroMonetario(valor)];
+  }));
   return {
     ...data,
     estudiante: { ...data.estudiante, nombreCompleto: String(data.estudiante.nombreCompleto ?? 'Estudiante') },
@@ -33,6 +36,27 @@ export async function descargarPdf(response, nombre) {
   document.body.appendChild(enlace);
   enlace.click();
   enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+export async function abrirPdfNuevaPestana(response, nombreFallback = 'comprobante.pdf') {
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.mensaje || data?.message || data?.error || `No se pudo obtener el documento (${response.status}).`);
+  }
+  const raw = await response.blob();
+  if (!(await raw.slice(0, 5).text()).startsWith('%PDF-')) throw new Error('El servidor no devolvió un PDF válido.');
+  const blob = new Blob([raw], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombreFallback;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
