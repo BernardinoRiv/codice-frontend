@@ -868,12 +868,16 @@ export default function RegistroNuevoIngreso() {
   const labelClass = "block text-[11px] font-bold text-slate-700 uppercase tracking-widest mb-1.5 ml-1";
   const sectionTitleClass = "text-[12px] font-extrabold text-slate-900 uppercase tracking-widest mb-5 pb-2 border-b border-slate-200 flex items-center gap-2";
 
-  const opcionesTipoBeca = [
-    { id: '1', nombre: 'Ninguna (Alumno Regular)' },
-    { id: '2', nombre: 'Franja Becaria (Subsidio Parcial)' },
-    { id: '3', nombre: 'Beca Completa Institucional (100%)' },
+  const catalogoTiposBeca = [
+    { id: '1', nombre: 'Ninguna (Estudiante Regular)' },
+    { id: '2', nombre: 'Franja Becaria' },
+    { id: '3', nombre: 'Beca Completa (100%)' },
     { id: '4', nombre: 'Beca de Terceros (Paga entidad externa)' },
   ];
+  const opcionesTipoBeca = catalogoTiposBeca.filter(opcion => {
+    const nombre = normalizarBusqueda(opcion?.nombre);
+    return !nombre.includes('tercero') && !nombre.includes('externa');
+  });
 
   return (
     <div className="w-full max-w-7xl pb-20 font-sans text-slate-900 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1076,10 +1080,11 @@ export default function RegistroNuevoIngreso() {
                   {tipoBeca === '3' && (
                     <>
                       <FilaResumen etiqueta="Subtotal sin beca" valor={`$${finanzas.subtotal.toFixed(2)}`} conBorde />
-                      <FilaResumen etiqueta="Descuento Beca 100%" valor={`-$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
-                      <FilaResumen etiqueta="Total a pagar" valor={`$${finanzas.total.toFixed(2)}`} tipo="total" conBorde />
+                      <FilaResumen etiqueta="Total del ciclo cubierto por beca" valor={`$${finanzas.descuento.toFixed(2)}`} tipo="fuerte" />
+                      <FilaResumen etiqueta="Descuento institucional" valor={`$${finanzas.descuento.toFixed(2)}`} tipo="descuento" />
+                      <FilaResumen etiqueta="Pago inicial requerido al aspirante" valor={`$${finanzas.pagoInicial.toFixed(2)}`} tipo="total" conBorde />
                       <p className="text-xs text-emerald-800 font-semibold leading-relaxed bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                        El estudiante quedará matriculado de inmediato y recibirá su comprobante PDF de beca y credenciales por correo.
+                        La matrícula se activará de inmediato y se enviarán sus credenciales y comprobante al correo personal.
                       </p>
                     </>
                   )}
@@ -1189,7 +1194,7 @@ export default function RegistroNuevoIngreso() {
 
               <p className="text-xs text-slate-600 font-medium leading-relaxed mb-6">
                 {tipoBeca === '3'
-                  ? 'El aspirante quedará matriculado de inmediato. El comprobante de beca y las credenciales se enviarán por correo.'
+                  ? 'La matrícula se activará de inmediato y se enviarán sus credenciales y comprobante al correo personal.'
                   : tipoBeca === '4'
                     ? 'La entidad externa cubrirá el ciclo completo; se reservarán los cupos sin generar deuda para el aspirante.'
                     : 'Se reservarán los cupos en los grupos seleccionados y se generará la deuda en el sistema financiero institucional para ser cancelada en colectaduría.'}

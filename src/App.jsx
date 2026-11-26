@@ -35,6 +35,7 @@ import DirectorioEstudiantes from './pages/estudiantes/DirectorioEstudiantes'
 import InformacionEstudiante from './pages/estudiantes/InformacionEstudiante';
 import DirectorioEmpleados from './pages/empleados/DirectorioEmpleados';
 import InformacionEmpleado from './pages/empleados/InformacionEmpleado';
+import GestionEvaluacionesSolicitudes from './pages/admin/GestionEvaluacionesSolicitudes';
 
 
 
@@ -62,7 +63,8 @@ const VISTAS = {
   'directorio-estudiantes': DirectorioEstudiantes,
   'directorio-estudiantes/:idEstudiante': InformacionEstudiante,
   'directorio-empleados': DirectorioEmpleados,
-  'directorio-empleados/:idEmpleado': InformacionEmpleado
+  'directorio-empleados/:idEmpleado': InformacionEmpleado,
+  'calendario-evaluaciones': GestionEvaluacionesSolicitudes
 };
 
 function RutaProtegida({ children }) {
