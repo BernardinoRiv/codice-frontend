@@ -5,7 +5,7 @@ export const GRUPOS_RUTAS = [
   { nombre: 'Administración', roles: [ROLES.ADMINISTRADOR], rutas: ['registro-empleados', 'registro-docente', 'carreras', 'pensum', 'materias'] },
   { nombre: 'Directorio académico', roles: [ROLES.ADMINISTRADOR, ROLES.REGISTRO_ACADEMICO], rutas: ['directorio-docentes', 'directorio-docentes/:idDocente'] },
   { nombre: 'Evaluaciones', roles: [ROLES.ADMINISTRADOR, ROLES.REGISTRO_ACADEMICO], rutas: ['calendario-evaluaciones'] },
-  { nombre: 'Gestión académica', roles: [ROLES.ADMINISTRADOR, ROLES.REGISTRO_ACADEMICO, ROLES.EMPLEADO], rutas: ['nuevo-ingreso', 'oferta-academica', 'ciclos-planificacion', 'gestion-secciones', 'directorio-estudiantes', 'directorio-estudiantes/:idEstudiante', 'directorio-empleados', 'directorio-empleados/:idEmpleado'] },
+  { nombre: 'Gestión académica', roles: [ROLES.ADMINISTRADOR, ROLES.REGISTRO_ACADEMICO], rutas: ['nuevo-ingreso', 'oferta-academica', 'ciclos-planificacion', 'gestion-secciones', 'directorio-estudiantes', 'directorio-estudiantes/:idEstudiante', 'directorio-empleados', 'directorio-empleados/:idEmpleado'] },
   { nombre: 'Estudiantes', roles: [ROLES.ESTUDIANTE], rutas: ['clases', 'mis-notas', 'mi-estado-cuenta', 'escanear-asistencia', 'matricula'] },
   { nombre: 'Docentes', roles: [ROLES.DOCENTE], rutas: ['notas', 'asistencias'] },
   { nombre: 'Finanzas', roles: [ROLES.FINANZAS, ROLES.ADMINISTRADOR], rutas: ['pagos', 'aranceles', 'facturas'] },
@@ -16,3 +16,15 @@ export const PERMISOS_RUTAS = Object.fromEntries(
     rutas.map(path => [`/dashboard/${path}`, roles])
   )
 );
+
+export function puedeVerRuta(sesion, ruta) {
+  const roles = PERMISOS_RUTAS[ruta];
+  if (!roles) return false;
+
+  if (sesion.roles.includes(ROLES.EMPLEADO)) {
+    const vista = ruta.slice('/dashboard/'.length);
+    return vista === 'inicio' || sesion.vistasEmpleado?.includes(vista) === true;
+  }
+
+  return sesion.roles.some(rol => roles.includes(rol));
+}

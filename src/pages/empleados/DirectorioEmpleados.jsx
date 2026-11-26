@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useId, useRef, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -18,12 +19,250 @@ import {
   X
 } from "lucide-react";
 
+import { normalizarBusqueda } from "../../utils/validacionesRegistro";
+
+// El menú se superpone sin cambiar la altura del formulario y se abre
+// hacia arriba cuando falta espacio. Dentro de un diálogo conserva su foco.
+function SelectBuscador({
+  label,
+  value,
+  onChange,
+  options = [],
+  placeholder = "Seleccione una opción",
+  searchPlaceholder = "Buscar...",
+  disabled = false,
+  loading = false,
+  opcionTodos,
+  ocultarEtiqueta = false,
+}) {
+  const [destino, setDestino] = useState(null);
+  const open = Boolean(destino) && !disabled && !loading;
+  const [search, setSearch] = useState("");
+  const [activo, setActivo] = useState(0);
+  const [posicion, setPosicion] = useState(null);
+  const ref = useRef(null);
+  const panelRef = useRef(null);
+  const listaId = useId();
+  const lista = opcionTodos
+    ? [{ id: "", nombre: opcionTodos }, ...options]
+    : options;
+  const filtrados = lista.filter((item) =>
+    normalizarBusqueda(item.nombre).includes(normalizarBusqueda(search)),
+  );
+  const seleccionado = lista.find((item) => String(item.id) === String(value));
+  const abrir = (trigger) => {
+    setDestino(trigger.closest('[role="dialog"]') || trigger.ownerDocument.body);
+    setSearch("");
+    setActivo(0);
+  };
+  const cerrar = (devolverFoco = false) => {
+    setDestino(null);
+    if (devolverFoco) ref.current?.focus();
+  };
+  useLayoutEffect(() => {
+    if (!open) return;
+    const posicionar = () => {
+      const rect = ref.current?.getBoundingClientRect();
+      if (!rect) return;
+      const margen = 12;
+      const abajo = window.innerHeight - rect.bottom - margen - 6;
+      const arriba = rect.top - margen - 6;
+      const haciaArriba = abajo < 280 && arriba > abajo;
+      const altura = Math.max(0, Math.min(320, haciaArriba ? arriba : abajo));
+      const ancho = Math.min(
+        Math.max(rect.width, 240),
+        window.innerWidth - margen * 2,
+      );
+      setPosicion({
+        position: "fixed",
+        width: ancho,
+        left: Math.max(
+          margen,
+          Math.min(rect.left, window.innerWidth - ancho - margen),
+        ),
+        maxHeight: altura,
+        ...(haciaArriba
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
+      });
+    };
+    posicionar();
+    window.addEventListener("resize", posicionar);
+    window.addEventListener("scroll", posicionar, true);
+    return () => {
+      window.removeEventListener("resize", posicionar);
+      window.removeEventListener("scroll", posicionar, true);
+    };
+  }, [open]);
+  const enfocarBuscador = useCallback((input) => { input?.focus(); }, []);
+  useEffect(() => {
+    if (!open) return;
+    const fuera = (event) => {
+      if (
+        !ref.current?.contains(event.target) &&
+        !panelRef.current?.contains(event.target)
+      )
+        setDestino(null);
+    };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [open]);
+  useEffect(() => {
+    panelRef.current
+      ?.querySelector('[data-active="true"]')
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [activo]);
+  const elegir = (item) => {
+    onChange(item.id);
+    cerrar(true);
+    setSearch("");
+  };
+  const teclado = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cerrar(true);
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setActivo((i) =>
+        Math.max(
+          0,
+          Math.min(
+            filtrados.length - 1,
+            i + (event.key === "ArrowDown" ? 1 : -1),
+          ),
+        ),
+      );
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (filtrados[activo]) elegir(filtrados[activo]);
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      cerrar(true);
+    }
+  };
+  return (
+    <div className="min-w-0">
+      <label
+        htmlFor={`${listaId}-trigger`}
+        className={ocultarEtiqueta ? "sr-only" : "block text-xs font-semibold text-slate-600 mb-2"}
+      >
+        {label}
+      </label>
+      <button
+        ref={ref}
+        id={`${listaId}-trigger`}
+        type="button"
+        disabled={disabled || loading}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listaId : undefined}
+        onClick={event => {
+          if (open) cerrar();
+          else abrir(event.currentTarget);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            if (!open) abrir(event.currentTarget);
+          }
+        }}
+        className="enabled:cursor-pointer disabled:cursor-not-allowed w-full min-h-11 bg-white border border-slate-200 rounded-xl px-4 py-3 text-base sm:text-sm font-normal text-slate-800 shadow-sm flex items-center justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-slate-100 focus:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span
+          className={`min-w-0 truncate ${value === "" || !seleccionado ? "text-slate-500" : ""}`}
+          title={seleccionado?.nombre}
+        >
+          {loading ? "Cargando catálogo…" : seleccionado?.nombre || placeholder}
+        </span>
+        <svg
+          aria-hidden="true"
+          className={`w-4 h-4 shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open &&
+        posicion &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={posicion}
+            onKeyDown={teclado}
+            className="z-[10020] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+          >
+            <div className="relative p-3 border-b border-slate-100 shrink-0">
+              <Search aria-hidden="true" size={15} className="pointer-events-none absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={enfocarBuscador}
+                role="combobox"
+                aria-label={searchPlaceholder}
+                aria-expanded="true"
+                aria-controls={listaId}
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  filtrados[activo] ? `${listaId}-${activo}` : undefined
+                }
+                value={search}
+                onChange={e => { setSearch(e.target.value); setActivo(0); }}
+                placeholder={searchPlaceholder}
+                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-base sm:text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              />
+            </div>
+            <div
+              id={listaId}
+              role="listbox"
+              aria-label={label}
+              className="min-h-0 divide-y divide-slate-100 overflow-y-auto overscroll-contain"
+            >
+              {filtrados.map((item, index) => (
+                <div
+                  key={item.id}
+                  id={`${listaId}-${index}`}
+                  role="option"
+                  aria-selected={String(item.id) === String(value)}
+                  data-active={index === activo}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => elegir(item)}
+                  onMouseMove={() => setActivo(index)}
+                  className={`flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-normal text-slate-800 leading-relaxed ${String(item.id) === String(value) ? "bg-slate-50" : index === activo ? "bg-slate-100" : ""}`}
+                >
+                  <span className="min-w-0 break-words">{item.nombre}</span>
+                  {String(item.id) === String(value) && (
+                    <span aria-hidden="true" className="shrink-0">
+                      ✓
+                    </span>
+                  )}
+                </div>
+              ))}
+              {!filtrados.length && (
+                <p
+                  role="status"
+                  className="p-4 text-center text-sm text-slate-500"
+                >
+                  {options.length
+                    ? "Sin coincidencias."
+                    : "No hay opciones disponibles en el catálogo."}
+                </p>
+              )}
+            </div>
+          </div>,
+          destino,
+        )}
+    </div>
+  );
+}
+
 const API = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 const normalizar = (valor) => String(valor ?? "")
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
   .toLowerCase();
-const estadoLaboral = (e) => String(e.estadoEmpleado || "SIN ESTADO").toUpperCase();
+const estadoLaboral = (e) => String(e.estadoEmpleado || "SIN ESTADO").trim().toUpperCase();
 const contratoPorVencer = (e) => {
   if (!e.fechaFin) return false;
   const fecha = new Date(`${String(e.fechaFin).slice(0, 10)}T12:00:00`);
@@ -33,7 +272,7 @@ const contratoPorVencer = (e) => {
 };
 const estado = (e) => !e.idUsuario
   ? "SIN USUARIO"
-  : String(e.estadoUsuario || "SIN ESTADO").toUpperCase();
+  : String(e.estadoUsuario || "SIN ESTADO").trim().toUpperCase();
 
 async function apiRequest(ruta, options = {}) {
   const response = await fetch(`${API}${ruta}`, {
@@ -75,7 +314,7 @@ function Stat({ icon: Icon, title, value, detail, active, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`w-full rounded-2xl border bg-white p-5 text-left shadow-sm transition
+      className={`enabled:cursor-pointer disabled:cursor-not-allowed w-full rounded-2xl border bg-white p-5 text-left shadow-sm transition
         hover:border-slate-300 hover:shadow-md focus-visible:outline-none
         focus-visible:ring-2 focus-visible:ring-slate-500
         ${active ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200"}`}
@@ -134,7 +373,7 @@ export default function DirectorioEmpleados() {
   const filtrados = useMemo(() => {
     return empleados.filter(e => {
       const texto = normalizar(
-        `${e.nombres} ${e.apellidos} ${e.codigoEmpleado} ${e.correoInstitucional} ${e.numeroDocumento} ${e.area} ${e.cargo} ${e.nombreSede}`
+        `${e.nombres} ${e.apellidos} ${e.codigoEmpleado} ${e.correoInstitucional} ${e.numeroDocumento} ${e.nombreArea ?? e.area ?? ""} ${e.nombreCargo ?? e.cargo ?? ""} ${e.nombreSede}`
       );
 
       const coincideBusqueda = texto.includes(normalizar(busqueda));
@@ -142,8 +381,8 @@ export default function DirectorioEmpleados() {
         filtro === "TODOS" ||
         (filtro === "POR_VENCER"
           ? contratoPorVencer(e)
-          : filtro === "LABORAL_ACTIVO"
-            ? estadoLaboral(e) === "ACTIVO"
+          : filtro.startsWith("LABORAL_")
+            ? estadoLaboral(e) === filtro.slice("LABORAL_".length)
             : estado(e) === filtro);
 
       return coincideBusqueda && coincideFiltro;
@@ -163,7 +402,10 @@ export default function DirectorioEmpleados() {
   };
 
   const ejecutarAccion = async () => {
-    if (!modal) return;
+    if (!modal || procesando) return;
+    if (modal.accion === "reset" && !empleados.some(e => e.idEmpleado === modal.empleado.idEmpleado && estado(e) === "ACTIVO")) {
+      return toast.error("La cuenta debe estar activa para restablecer la contraseña.");
+    }
     if (modal.accion !== "reset" && motivo.trim().length < 5) {
       return toast.error("Escribe un motivo de al menos 5 caracteres.");
     }
@@ -214,7 +456,7 @@ export default function DirectorioEmpleados() {
           type="button"
           onClick={cargarEmpleados}
           disabled={cargando}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+          className="enabled:cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
         >
           <RefreshCw
             size={16}
@@ -282,17 +524,15 @@ export default function DirectorioEmpleados() {
                 className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
               />
             </div>
-            <select
-              value={filtro}
-              onChange={e => setFiltro(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
-            >
-              <option value="TODOS">Todos los estados</option>
-              <option value="LABORAL_ACTIVO">Empleados activos</option>
-              <option value="ACTIVO">Cuentas activas</option>
-              <option value="BLOQUEADO">Bloqueados</option>
-              <option value="POR_VENCER">Contratos por vencer</option>
-            </select>
+            <SelectBuscador label="Filtrar empleados por estado" ocultarEtiqueta value={filtro}
+              onChange={setFiltro} searchPlaceholder="Buscar estado..." options={[
+                { id: "TODOS", nombre: "Todos los estados" },
+                { id: "LABORAL_ACTIVO", nombre: "Empleados activos" },
+                { id: "LABORAL_INACTIVO", nombre: "Empleados inactivos" },
+                { id: "ACTIVO", nombre: "Cuentas activas" },
+                { id: "BLOQUEADO", nombre: "Cuentas bloqueadas" },
+                { id: "POR_VENCER", nombre: "Contratos por vencer" }
+              ]} />
           </div>
         </div>
 
@@ -303,7 +543,8 @@ export default function DirectorioEmpleados() {
                 <th className="px-5 py-4">Empleado</th>
                 <th className="px-5 py-4">Área / Cargo</th>
                 <th className="px-5 py-4">Correo institucional</th>
-                <th className="px-5 py-4">Estado</th>
+                <th scope="col" className="px-5 py-4">Estado laboral</th>
+                <th scope="col" className="px-5 py-4">Estado de cuenta</th>
                 <th className="px-5 py-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -331,18 +572,21 @@ export default function DirectorioEmpleados() {
                       {e.correoInstitucional || "No registrado"}
                     </td>
                     <td className="px-5 py-4">
+                      <EstadoBadge value={estadoLaboral(e)} />
+                    </td>
+                    <td className="px-5 py-4">
                       <EstadoBadge value={actual} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
-                          disabled={!e.idUsuario}
+                          disabled={actual !== "ACTIVO"}
                           onClick={() => setModal({
                             accion: "reset",
                             empleado: e
                           })}
-                          title="Restablecer contraseña"
+                          title={actual === "BLOQUEADO" ? "Desbloquea la cuenta para restablecer la contraseña" : "Restablecer contraseña"}
                           aria-label={`Restablecer contraseña de ${e.nombres} ${e.apellidos}`}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-40"
                         >
@@ -476,7 +720,7 @@ export default function DirectorioEmpleados() {
               type="button"
               onClick={cerrarModal}
               disabled={procesando}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              className="enabled:cursor-pointer disabled:cursor-not-allowed rounded-lg p-1 text-slate-400 hover:bg-slate-100"
               aria-label="Cerrar modal"
             >
               <X size={19} />
@@ -505,7 +749,7 @@ export default function DirectorioEmpleados() {
                 </label>
                 <textarea
                   rows={3}
-                  maxLength={500}
+                  maxLength={100}
                   value={motivo}
                   onChange={e => setMotivo(e.target.value)}
                   placeholder="Describe el motivo administrativo..."
@@ -517,7 +761,7 @@ export default function DirectorioEmpleados() {
               <button
                 onClick={cerrarModal}
                 disabled={procesando}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                className="enabled:cursor-pointer disabled:cursor-not-allowed rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700"
               >
                 Cancelar
               </button>
@@ -527,7 +771,7 @@ export default function DirectorioEmpleados() {
                   procesando ||
                   (modal.accion !== "reset" && motivo.trim().length < 5)
                 }
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
+                className={`enabled:cursor-pointer disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${
                   modal.accion === "bloquear"
                     ? "bg-rose-600 hover:bg-rose-700"
                     : "bg-slate-900 hover:bg-slate-800"
